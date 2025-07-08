@@ -20,6 +20,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+    IconCheck,
     IconChevronDown,
     IconChevronLeft,
     IconChevronRight,
@@ -28,10 +29,8 @@ import {
     IconDotsVertical,
     IconGripVertical,
     IconLayoutColumns,
-    IconLoader,
     IconPlus,
-    IconUser,
-    IconTrash
+    IconPower,
 } from "@tabler/icons-react"
 import {
     ColumnDef,
@@ -48,8 +47,6 @@ import {
     useReactTable,
     VisibilityState,
 } from "@tanstack/react-table"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { z } from "zod"
 
@@ -71,7 +68,6 @@ import {
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -96,24 +92,18 @@ import {
     TabsContent,
 } from "@/components/ui/tabs"
 
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog"
 import { API_URL } from "@/config/config";
 import { getCsrfToken } from "@/lib/getcrfstoken"
 import { useRouter } from "next/navigation"
+import { Switch } from "@/components/ui/switch"
 
 export const schema = z.object({
-    plate: z.string(),
-    brand: z.string(),
-    model: z.string(),
-    color: z.string(),
-    vehicle_type: z.string(),
-    owner_id: z.string().uuid(),
+    id: z.string().uuid(),
+    name: z.string(),
+    price: z.number(),
+    description: z.string(),
+    duration: z.number(),
+    is_active: z.boolean()
 })
 
 function DragHandle({ id }: { id: string }) {
@@ -139,7 +129,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     {
         id: "drag",
         header: () => null,
-        cell: ({ row }) => <DragHandle id={row.original.plate} />,
+        cell: ({ row }) => <DragHandle id={row.original.id} />,
     },
     {
         id: "select",
@@ -168,161 +158,135 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         enableHiding: false,
     },
     {
-        accessorKey: "plate",
-        header: "Placa",
+        accessorKey: "name",
+        header: "Nombre",
+        cell: ({ row }) => row.original.name,
+    },
+    {
+        accessorKey: "price",
+        header: "Precio",
         cell: ({ row }) => (
             <div className="font-medium">
-                {row.original.plate}
+                {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'COP' }).format(row.original.price)}
             </div>
         ),
     },
     {
-        accessorKey: "brand",
-        header: "Marca",
-        cell: ({ row }) => row.original.brand,
+        accessorKey: "description",
+        header: "Descripción",
+        cell: ({ row }) => (
+            <div className="max-w-[200px] truncate">
+                {row.original.description}
+            </div>
+        ),
     },
     {
-        accessorKey: "model",
-        header: "Modelo",
-        cell: ({ row }) => row.original.model,
+        accessorKey: "duration",
+        header: "Duración",
+        cell: ({ row }) => row.original.duration,
     },
     {
-        accessorKey: "color",
-        header: "Color",
+        accessorKey: "is_active",
+        header: "Servicio Activo",
         cell: ({ row }) => (
             <div className="flex items-center gap-2">
-                <div
-                    className="size-4 rounded-full border"
-                    style={{ backgroundColor: row.original.color.toLowerCase() }}
-                />
-                {row.original.color}
+                {row.original.is_active ? (
+                    <>
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        <span>Activo</span>
+                    </>
+                ) : (
+                    <>
+                        <div className="h-2 w-2 rounded-full bg-red-500" />
+                        <span>Inactivo</span>
+                    </>
+                )}
             </div>
         ),
-    },
-    {
-        accessorKey: "vehicle_type",
-        header: "Tipo",
-        cell: ({ row }) => {
-            const type = row.original.vehicle_type;
-            const typeLabels: Record<string, string> = {
-                coche: "Coche",
-                moto: "Motocicleta",
-                camion: "Camión",
-                otro: "Otro"
-            };
-
-            return typeLabels[type] || type;
+        // Optional: Add sorting/filtering capabilities
+        enableSorting: true,
+        enableColumnFilter: true,
+        filterFn: (row, id, value) => {
+            return value.includes(row.getValue(id))
         }
     },
     {
-        accessorKey: "owner_id",
-        header: "Dueño",
-        cell: ({ row }) => (
-            <div className="flex items-center gap-2">
-                <IconUser className="size-4" />
-                {row.original.owner_id.substring(0, 8)}...
-            </div>
-        ),
-    },
-    {
         id: "actions",
-        cell: ({ row }) => {
-            const [isDialogOpen, setIsDialogOpen] = useState(false)
-            const [isProcessing, setIsProcessing] = useState(false)
+        cell: ({ row, table }) => {
+            const [isProcessing, setIsProcessing] = useState(false);
+            const service = row.original;
 
-            const handleEdit = () => {
-                // Abrir modal de edición con los datos actuales
-                toast.info(`Editando vehículo ${row.original.plate}`)
-            }
-
-            const handleDelete = async () => {
-                setIsProcessing(true)
+            const toggleActiveStatus = async () => {
+                setIsProcessing(true);
                 try {
                     const csrfToken = getCsrfToken();
-                    const response = await fetch(`${API_URL}/vehicles/${row.original.plate}`, {
-                        method: 'DELETE',
+                    const response = await fetch(`${API_URL}/services/${service.id}`, {
+                        method: 'PATCH',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken
+                            'X-CSRF-TOKEN': csrfToken || ''
                         },
-                        credentials: 'include'
-                    })
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            is_active: !service.is_active  // Solo enviamos este campo
+                        }),
+                    });
 
-                    if (!response.ok) throw new Error(await response.text())
+                    if (!response.ok) {
+                        throw new Error(await response.text());
+                    }
 
-                    toast.success(`Vehículo ${row.original.plate} eliminado correctamente`)
-                    return true
+                    table.options.meta?.updateData(row.index, 'is_active', !service.is_active);
+
+                    toast.success(
+                        `Servicio ${service.name} ${!service.is_active ? 'activado' : 'desactivado'} correctamente`
+                    );
                 } catch (error) {
-                    toast.error(error instanceof Error ? error.message : 'Error al eliminar vehículo')
-                    return false
+                    toast.error(
+                        error instanceof Error
+                            ? error.message
+                            : `Error al ${service.is_active ? 'desactivar' : 'activar'} servicio`
+                    );
                 } finally {
-                    setIsProcessing(false)
-                    setIsDialogOpen(false)
+                    setIsProcessing(false);
                 }
-            }
+            };
 
             return (
-                <>
+                <div className="flex items-center gap-4">
+                    {/* Switch para activar/desactivar */}
+                    <div className="flex items-center gap-2">
+                        <Switch
+                            checked={service.is_active}
+                            onCheckedChange={toggleActiveStatus}
+                            disabled={isProcessing}
+                        />
+                        <span className="text-sm font-medium">
+                            {service.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                    </div>
+
+                    {/* Menú de acciones adicionales */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-                                size="icon"
-                            >
-                                <IconDotsVertical />
-                                <span className="sr-only">Abrir menú</span>
+                            <Button variant="ghost" size="icon" disabled={isProcessing}>
+                                <IconDotsVertical className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem onClick={handleEdit}>
-                                <span>Editar</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => setIsDialogOpen(true)}
-                                className="text-destructive focus:text-destructive"
-                            >
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={toggleActiveStatus}>
                                 <div className="flex items-center gap-2">
-                                    <IconTrash className="h-4 w-4" />
-                                    <span>Eliminar</span>
+                                    {service.is_active ? (
+                                        <IconPower className="h-4 w-4 text-yellow-500" />
+                                    ) : (
+                                        <IconCheck className="h-4 w-4 text-green-500" />
+                                    )}
+                                    <span>{service.is_active ? 'Desactivar' : 'Activar'}</span>
                                 </div>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-
-                    {/* Diálogo de confirmación para eliminar */}
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Confirmar eliminación</DialogTitle>
-                                <DialogDescription>
-                                    ¿Estás seguro de eliminar el vehículo con placa {row.original.plate}? Esta acción no se puede deshacer.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex justify-end gap-2 mt-4">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsDialogOpen(false)}
-                                    disabled={isProcessing}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    onClick={handleDelete}
-                                    disabled={isProcessing}
-                                    variant="destructive"
-                                >
-                                    {isProcessing ? (
-                                        <IconLoader className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <span>Eliminar</span>
-                                    )}
-                                </Button>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                </>
+                </div>
             )
         }
     }
@@ -330,7 +294,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
 
 function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
     const { transform, transition, setNodeRef, isDragging } = useSortable({
-        id: row.original.plate,
+        id: row.original.id,
     })
 
     return (
@@ -353,7 +317,7 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
     )
 }
 
-export function DataTable({
+export function ServicesTable({
     data: initialData,
 }: {
     data: z.infer<typeof schema>[]
@@ -378,11 +342,13 @@ export function DataTable({
     )
 
     const dataIds = useMemo<UniqueIdentifier[]>(
-        () => data?.map(({ plate }) => plate) || [],
+        () => data?.map(({ id }) => id) || [],
         [data]
     )
 
-    const table = useReactTable({
+    type Service = z.infer<typeof schema>;
+
+    const table = useReactTable<Service>({
         data,
         columns,
         state: {
@@ -392,7 +358,7 @@ export function DataTable({
             columnFilters,
             pagination,
         },
-        getRowId: (row) => row.plate,
+        getRowId: (row) => row.id,
         enableRowSelection: true,
         onRowSelectionChange: setRowSelection,
         onSortingChange: setSorting,
@@ -405,6 +371,15 @@ export function DataTable({
         getSortedRowModel: getSortedRowModel(),
         getFacetedRowModel: getFacetedRowModel(),
         getFacetedUniqueValues: getFacetedUniqueValues(),
+        meta: {
+            updateData: (rowIndex: number, key: keyof Service, value: any) => {
+                setData((old) =>
+                    old.map((row, index) =>
+                        index === rowIndex ? { ...row, [key]: value } : row
+                    )
+                );
+            },
+        },
     })
 
     const router = useRouter()
@@ -421,7 +396,7 @@ export function DataTable({
     }
 
     return (
-        <Tabs defaultValue="citas" className="w-full flex-col justify-start gap-6">
+        <Tabs defaultValue="servicios" className="w-full flex-col justify-start gap-6">
             <div className="flex items-center justify-end px-4 lg:px-6">
                 <Label htmlFor="view-selector" className="sr-only">
                     Vista
@@ -454,24 +429,23 @@ export function DataTable({
                                                 column.toggleVisibility(!!value)
                                             }
                                         >
-                                            {column.id === "appointment_time" ? "Fecha y Hora" :
-                                                column.id === "status" ? "Estado" :
-                                                    column.id === "created_at" ? "Creado el" :
-                                                        column.id === "user_id" ? "Usuario" :
-                                                            column.id === "vehicle_id" ? "Vehículo" : column.id}
+                                            {column.id === "name" ? "Nombre" :
+                                                column.id === "price" ? "Precio" :
+                                                    column.id === "description" ? "Descripción" :
+                                                        column.id === "duration" ? "Duración" : column.id}
                                         </DropdownMenuCheckboxItem>
                                     )
                                 })}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/vehicles/new")}>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/services/new")}>
                         <IconPlus />
-                        <span className="hidden lg:inline">Nuevo vehiculo</span>
+                        <span className="hidden lg:inline">Nuevo servicio</span>
                     </Button>
                 </div>
             </div>
             <TabsContent
-                value="citas"
+                value="servicios"
                 className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
             >
                 <div className="overflow-hidden rounded-lg border">
@@ -517,7 +491,7 @@ export function DataTable({
                                             colSpan={columns.length}
                                             className="h-24 text-center"
                                         >
-                                            No se encontraron vehiculos.
+                                            No se encontraron servicios.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -602,12 +576,6 @@ export function DataTable({
                         </div>
                     </div>
                 </div>
-            </TabsContent>
-            <TabsContent value="historial" className="flex flex-col px-4 lg:px-6">
-                <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-            </TabsContent>
-            <TabsContent value="vehiculos" className="flex flex-col px-4 lg:px-6">
-                <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
             </TabsContent>
         </Tabs>
     )

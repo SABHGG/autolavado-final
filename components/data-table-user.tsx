@@ -108,12 +108,11 @@ import { getCsrfToken } from "@/lib/getcrfstoken"
 import { useRouter } from "next/navigation"
 
 export const schema = z.object({
-    plate: z.string(),
-    brand: z.string(),
-    model: z.string(),
-    color: z.string(),
-    vehicle_type: z.string(),
-    owner_id: z.string().uuid(),
+    id: z.string().uuid(),
+    username: z.string(),
+    email: z.string(),
+    phone: z.string(),
+    role: z.string(),
 })
 
 function DragHandle({ id }: { id: string }) {
@@ -139,7 +138,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     {
         id: "drag",
         header: () => null,
-        cell: ({ row }) => <DragHandle id={row.original.plate} />,
+        cell: ({ row }) => <DragHandle id={row.original.id} />,
     },
     {
         id: "select",
@@ -168,61 +167,24 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         enableHiding: false,
     },
     {
-        accessorKey: "plate",
-        header: "Placa",
-        cell: ({ row }) => (
-            <div className="font-medium">
-                {row.original.plate}
-            </div>
-        ),
+        accessorKey: "username",
+        header: "Nombre de usuario",
+        cell: ({ row }) => row.original.username,
     },
     {
-        accessorKey: "brand",
-        header: "Marca",
-        cell: ({ row }) => row.original.brand,
+        accessorKey: "email",
+        header: "Correo electrónico",
+        cell: ({ row }) => row.original.email,
     },
     {
-        accessorKey: "model",
-        header: "Modelo",
-        cell: ({ row }) => row.original.model,
+        accessorKey: "phone",
+        header: "Teléfono",
+        cell: ({ row }) => row.original.phone,
     },
     {
-        accessorKey: "color",
-        header: "Color",
-        cell: ({ row }) => (
-            <div className="flex items-center gap-2">
-                <div
-                    className="size-4 rounded-full border"
-                    style={{ backgroundColor: row.original.color.toLowerCase() }}
-                />
-                {row.original.color}
-            </div>
-        ),
-    },
-    {
-        accessorKey: "vehicle_type",
-        header: "Tipo",
-        cell: ({ row }) => {
-            const type = row.original.vehicle_type;
-            const typeLabels: Record<string, string> = {
-                coche: "Coche",
-                moto: "Motocicleta",
-                camion: "Camión",
-                otro: "Otro"
-            };
-
-            return typeLabels[type] || type;
-        }
-    },
-    {
-        accessorKey: "owner_id",
-        header: "Dueño",
-        cell: ({ row }) => (
-            <div className="flex items-center gap-2">
-                <IconUser className="size-4" />
-                {row.original.owner_id.substring(0, 8)}...
-            </div>
-        ),
+        accessorKey: "role",
+        header: "Rol",
+        cell: ({ row }) => row.original.role,
     },
     {
         id: "actions",
@@ -232,14 +194,14 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
 
             const handleEdit = () => {
                 // Abrir modal de edición con los datos actuales
-                toast.info(`Editando vehículo ${row.original.plate}`)
+                toast.info(`Editando usuario ${row.original.username}`)
             }
 
             const handleDelete = async () => {
                 setIsProcessing(true)
                 try {
                     const csrfToken = getCsrfToken();
-                    const response = await fetch(`${API_URL}/vehicles/${row.original.plate}`, {
+                    const response = await fetch(`${API_URL}/users/${row.original.id}`, {
                         method: 'DELETE',
                         headers: {
                             'Content-Type': 'application/json',
@@ -250,10 +212,10 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
 
                     if (!response.ok) throw new Error(await response.text())
 
-                    toast.success(`Vehículo ${row.original.plate} eliminado correctamente`)
+                    toast.success(`Usuario ${row.original.username} eliminado correctamente`)
                     return true
                 } catch (error) {
-                    toast.error(error instanceof Error ? error.message : 'Error al eliminar vehículo')
+                    toast.error(error instanceof Error ? error.message : 'Error al eliminar usuario')
                     return false
                 } finally {
                     setIsProcessing(false)
@@ -297,7 +259,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
                             <DialogHeader>
                                 <DialogTitle>Confirmar eliminación</DialogTitle>
                                 <DialogDescription>
-                                    ¿Estás seguro de eliminar el vehículo con placa {row.original.plate}? Esta acción no se puede deshacer.
+                                    ¿Estás seguro de eliminar el usuario {row.original.username}? Esta acción no se puede deshacer.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="flex justify-end gap-2 mt-4">
@@ -330,7 +292,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
 
 function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
     const { transform, transition, setNodeRef, isDragging } = useSortable({
-        id: row.original.plate,
+        id: row.original.id,
     })
 
     return (
@@ -353,7 +315,7 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
     )
 }
 
-export function DataTable({
+export function UsersTable({
     data: initialData,
 }: {
     data: z.infer<typeof schema>[]
@@ -378,7 +340,7 @@ export function DataTable({
     )
 
     const dataIds = useMemo<UniqueIdentifier[]>(
-        () => data?.map(({ plate }) => plate) || [],
+        () => data?.map(({ id }) => id) || [],
         [data]
     )
 
@@ -392,7 +354,7 @@ export function DataTable({
             columnFilters,
             pagination,
         },
-        getRowId: (row) => row.plate,
+        getRowId: (row) => row.id,
         enableRowSelection: true,
         onRowSelectionChange: setRowSelection,
         onSortingChange: setSorting,
@@ -421,7 +383,7 @@ export function DataTable({
     }
 
     return (
-        <Tabs defaultValue="citas" className="w-full flex-col justify-start gap-6">
+        <Tabs defaultValue="usuarios" className="w-full flex-col justify-start gap-6">
             <div className="flex items-center justify-end px-4 lg:px-6">
                 <Label htmlFor="view-selector" className="sr-only">
                     Vista
@@ -454,24 +416,23 @@ export function DataTable({
                                                 column.toggleVisibility(!!value)
                                             }
                                         >
-                                            {column.id === "appointment_time" ? "Fecha y Hora" :
-                                                column.id === "status" ? "Estado" :
-                                                    column.id === "created_at" ? "Creado el" :
-                                                        column.id === "user_id" ? "Usuario" :
-                                                            column.id === "vehicle_id" ? "Vehículo" : column.id}
+                                            {column.id === "username" ? "Nombre de usuario" :
+                                                column.id === "email" ? "Correo electrónico" :
+                                                    column.id === "phone" ? "Teléfono" :
+                                                        column.id === "role" ? "Rol" : column.id}
                                         </DropdownMenuCheckboxItem>
                                     )
                                 })}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/vehicles/new")}>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/users/new")}>
                         <IconPlus />
-                        <span className="hidden lg:inline">Nuevo vehiculo</span>
+                        <span className="hidden lg:inline">Nuevo usuario</span>
                     </Button>
                 </div>
             </div>
             <TabsContent
-                value="citas"
+                value="usuarios"
                 className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
             >
                 <div className="overflow-hidden rounded-lg border">
@@ -517,7 +478,7 @@ export function DataTable({
                                             colSpan={columns.length}
                                             className="h-24 text-center"
                                         >
-                                            No se encontraron vehiculos.
+                                            No se encontraron usuarios.
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -602,12 +563,6 @@ export function DataTable({
                         </div>
                     </div>
                 </div>
-            </TabsContent>
-            <TabsContent value="historial" className="flex flex-col px-4 lg:px-6">
-                <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-            </TabsContent>
-            <TabsContent value="vehiculos" className="flex flex-col px-4 lg:px-6">
-                <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
             </TabsContent>
         </Tabs>
     )

@@ -35,6 +35,8 @@ export interface Vehicle {
   color: string;
   vehicle_type: "motocicleta" | "coche" | "camion" | "autobus" | "furgoneta";
   owner_id?: string;
+  updated_at: string;
+  created_at: string;
 }
 
 // Servicio
@@ -44,6 +46,7 @@ export interface Service {
   price: number;
   description: string;
   duration: number;
+  is_active: boolean;
 }
 
 // Cita (Appointment)

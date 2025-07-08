@@ -2,7 +2,7 @@
 import { API_URL } from '@/config/config';
 import { Vehicle } from '@/types/types';
 import { useState, useEffect } from 'react'
-import { VehiclesTable } from '@/components/data-table-vehicle';
+import { DataTable } from '@/components/data-table-vehicle';
 
 const VehiclePage = () => {
     const [data, setData] = useState<Vehicle[]>([]);
@@ -29,14 +29,11 @@ const VehiclePage = () => {
     }
 
     return (
-        <VehiclesTable
-            data={data
-                .filter(vehicle => typeof vehicle.id === 'string')
-                .map(vehicle => ({
-                    ...vehicle,
-                    id: vehicle.id as string,
-                }))
-            }
+        <DataTable
+            data={data.map(vehicle => ({
+                ...vehicle,
+                owner_id: vehicle.owner_id ?? ""
+            }))}
         />
     );
 }

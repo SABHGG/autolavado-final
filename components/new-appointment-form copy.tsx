@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
-import { IconCalendar, IconCar, IconLoader } from "@tabler/icons-react"
+import { IconCalendar, IconCar, IconUser, IconLoader } from "@tabler/icons-react"
 import { API_URL } from "@/config/config"
 import { getCsrfToken } from "@/lib/getcrfstoken"
 
@@ -39,15 +39,22 @@ const formSchema = z.object({
     appointment_time: z.date({
         required_error: "La fecha y hora son requeridas",
     }),
+    user_id: z.string().min(1, "Usuario es requerido"),
     vehicle_id: z.string().min(1, "Vehículo es requerido"),
-    services: z.array(z.number()).min(1, "Al menos un servicio es requerido"),
+    services: z.array(z.string()).min(1, "Al menos un servicio es requerido"),
 })
 
 interface Service {
-    id: number
+    id: string
     name: string
     price: number
     duration: number
+}
+
+interface User {
+    id: string
+    name: string
+    email: string
 }
 
 interface Vehicle {
@@ -68,10 +75,24 @@ export function NewAppointmentForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
             appointment_time: new Date(),
+            user_id: "",
             vehicle_id: "",
             services: [],
         },
     })
+
+    useEffect(() => {
+        const subscription = form.watch((value, { name, type }) => {
+            console.log("Cambio en formulario:", {
+                field: name,
+                type,
+                value,
+                vehicleId: value.vehicle_id,
+                formState: form.formState
+            })
+        })
+        return () => subscription.unsubscribe()
+    }, [form.watch])
 
     // Fetch services
     const [services, setServices] = useState<Service[]>([])
@@ -86,6 +107,21 @@ export function NewAppointmentForm({
             .then(setServices)
             .catch(() => setServices([]))
             .finally(() => setLoadingServices(false))
+    }, [])
+
+    // Fetch users
+    const [users, setUsers] = useState<User[]>([])
+    const [loadingUsers, setLoadingUsers] = useState(true)
+    useEffect(() => {
+        setLoadingUsers(true)
+        fetch(`${API_URL}/users/`, { credentials: "include" })
+            .then((res) => {
+                if (!res.ok) throw new Error("Error al cargar usuarios")
+                return res.json()
+            })
+            .then(setUsers)
+            .catch(() => setUsers([]))
+            .finally(() => setLoadingUsers(false))
     }, [])
 
     // Fetch vehicles
@@ -122,10 +158,7 @@ export function NewAppointmentForm({
         loadVehicles();
     }, []);
 
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        setIsSubmitting(true);
         try {
             const response = await fetch(`${API_URL}/appointments`, {
                 method: "POST",
@@ -136,8 +169,11 @@ export function NewAppointmentForm({
                 credentials: "include",
                 body: JSON.stringify({
                     appointment_time: values.appointment_time.toISOString(),
+                    user_id: values.user_id,
                     vehicle_id: values.vehicle_id,
-                    services: values.services.map((id) => ({ service_id: id })),
+                    services: values.services.map((id) => ({
+                        service_id: id,
+                    }))
                 }),
             })
 
@@ -153,8 +189,6 @@ export function NewAppointmentForm({
                     ? error.message
                     : "Ocurrió un error al crear la cita"
             )
-        } finally {
-            setIsSubmitting(false);
         }
     }
 
@@ -222,6 +256,47 @@ export function NewAppointmentForm({
                                     </div>
                                 </PopoverContent>
                             </Popover>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                {/* Campo de Usuario */}
+                <FormField
+                    control={form.control}
+                    name="user_id"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                                <IconUser className="h-4 w-4" />
+                                Usuario
+                            </FormLabel>
+                            <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                disabled={loadingUsers}
+                            >
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={
+                                            loadingUsers ? "Cargando usuarios..." : "Selecciona un usuario"
+                                        } />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {users.length > 0 ? (
+                                        users.map((user) => (
+                                            <SelectItem key={user.id} value={user.id}>
+                                                {user.name} ({user.email})
+                                            </SelectItem>
+                                        ))
+                                    ) : (
+                                        <SelectItem value="no-users" disabled>
+                                            {loadingUsers ? "Cargando..." : "No hay usuarios disponibles"}
+                                        </SelectItem>
+                                    )}
+                                </SelectContent>
+                            </Select>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -337,15 +412,8 @@ export function NewAppointmentForm({
                     >
                         Cancelar
                     </Button>
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? (
-                            <>
-                                <IconLoader className="h-4 w-4 animate-spin mr-2" />
-                                Creando...
-                            </>
-                        ) : (
-                            "Crear Cita"
-                        )}
+                    <Button type="submit">
+                        Crear Cita
                     </Button>
                 </div>
             </form>

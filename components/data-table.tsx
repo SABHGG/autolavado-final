@@ -122,6 +122,8 @@ import { User } from "@/types/types"
 import { fetchEmployees } from "@/services/employees"
 import { getCsrfToken } from "@/lib/getcrfstoken"
 import { useRouter } from "next/navigation"
+import { useUser } from "@/hooks/useUser"
+
 
 export const schema = z.object({
     id: z.number(),
@@ -256,6 +258,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     {
         id: "actions",
         cell: ({ row }) => {
+            const user = useUser() as User | null | undefined
             const [isAssignDialogOpen, setIsAssignDialogOpen] = React.useState(false)
             const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = React.useState(false)
             const [employees, setEmployees] = React.useState<User[]>([])
@@ -421,44 +424,50 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem onClick={handleEdit}>
-                                <span>Editar</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setIsAssignDialogOpen(true)}>
-                                <span>Asignar</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setIsRescheduleDialogOpen(true)}>
-                                <span>Reprogramar</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => handleStatusSelection('pendiente')}
-                                disabled={row.original.status === 'pendiente'}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <IconClock className="h-4 w-4" />
-                                    <span>Marcar como pendiente</span>
-                                </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => handleStatusSelection('en_progreso')}
-                                disabled={row.original.status === 'en_progreso'}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <IconProgress className="h-4 w-4" />
-                                    <span>Iniciar progreso</span>
-                                </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => handleStatusSelection('completada')}
-                                disabled={row.original.status === 'completada'}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <IconCheck className="h-4 w-4" />
-                                    <span>Marcar como completada</span>
-                                </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
+                            {
+                                user?.role === "admin" && (
+                                    <>
+                                        <DropdownMenuItem onClick={handleEdit}>
+                                            <span>Editar</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setIsAssignDialogOpen(true)}>
+                                            <span>Asignar</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setIsRescheduleDialogOpen(true)}>
+                                            <span>Reprogramar</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onClick={() => handleStatusSelection('pendiente')}
+                                            disabled={row.original.status === 'pendiente'}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <IconClock className="h-4 w-4" />
+                                                <span>Marcar como pendiente</span>
+                                            </div>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => handleStatusSelection('en_progreso')}
+                                            disabled={row.original.status === 'en_progreso'}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <IconProgress className="h-4 w-4" />
+                                                <span>Iniciar progreso</span>
+                                            </div>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => handleStatusSelection('completada')}
+                                            disabled={row.original.status === 'completada'}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <IconCheck className="h-4 w-4" />
+                                                <span>Marcar como completada</span>
+                                            </div>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                    </>
+                                )
+                            }
                             <DropdownMenuItem
                                 onClick={() => handleStatusSelection('cancelada')}
                                 disabled={row.original.status === 'cancelada'}
