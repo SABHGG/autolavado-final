@@ -81,19 +81,6 @@ export function NewAppointmentForm({
         },
     })
 
-    useEffect(() => {
-        const subscription = form.watch((value, { name, type }) => {
-            console.log("Cambio en formulario:", {
-                field: name,
-                type,
-                value,
-                vehicleId: value.vehicle_id,
-                formState: form.formState
-            })
-        })
-        return () => subscription.unsubscribe()
-    }, [form.watch])
-
     // Fetch services
     const [services, setServices] = useState<Service[]>([])
     const [loadingServices, setLoadingServices] = useState(true)

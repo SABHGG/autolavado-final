@@ -57,7 +57,7 @@ export function LoginForm({
       toast.success("Inicio de sesión exitoso")
       router.push("/dashboard")
 
-    } catch (error) {
+    } catch {
       toast.dismiss()
       form.setError("password", { message: "Error al conectar con el servidor" })
       toast.error("No se pudo conectar con el servidor")

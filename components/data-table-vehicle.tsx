@@ -48,24 +48,10 @@ import {
     useReactTable,
     VisibilityState,
 } from "@tanstack/react-table"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { z } from "zod"
-
-import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-    Drawer,
-    DrawerClose,
-    DrawerContent,
-    DrawerDescription,
-    DrawerFooter,
-    DrawerHeader,
-    DrawerTitle,
-    DrawerTrigger,
-} from "@/components/ui/drawer"
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -74,7 +60,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
     Select,
@@ -115,6 +100,110 @@ export const schema = z.object({
     vehicle_type: z.string(),
     owner_id: z.string().uuid(),
 })
+
+const ActionsCell = ({
+    row,
+}: {
+    row: Row<z.infer<typeof schema>>;
+}) => {
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [isProcessing, setIsProcessing] = useState(false)
+
+    const handleEdit = () => {
+        // Abrir modal de edición con los datos actuales
+        toast.info(`Editando vehículo ${row.original.plate}`)
+    }
+
+    const handleDelete = async () => {
+        setIsProcessing(true)
+        try {
+            const csrfToken = getCsrfToken();
+            const response = await fetch(`${API_URL}/vehicles/${row.original.plate}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || ''
+                },
+                credentials: 'include'
+            })
+
+            if (!response.ok) throw new Error(await response.text())
+
+            toast.success(`Vehículo ${row.original.plate} eliminado correctamente`)
+            return true
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Error al eliminar vehículo')
+            return false
+        } finally {
+            setIsProcessing(false)
+            setIsDialogOpen(false)
+        }
+    }
+
+    return (
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+                        size="icon"
+                    >
+                        <IconDotsVertical />
+                        <span className="sr-only">Abrir menú</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                    <DropdownMenuItem onClick={handleEdit}>
+                        <span>Editar</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                        onClick={() => setIsDialogOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                    >
+                        <div className="flex items-center gap-2">
+                            <IconTrash className="h-4 w-4" />
+                            <span>Eliminar</span>
+                        </div>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Diálogo de confirmación para eliminar */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirmar eliminación</DialogTitle>
+                        <DialogDescription>
+                            ¿Estás seguro de eliminar el vehículo con placa {row.original.plate}? Esta acción no se puede deshacer.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-2 mt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDialogOpen(false)}
+                            disabled={isProcessing}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleDelete}
+                            disabled={isProcessing}
+                            variant="destructive"
+                        >
+                            {isProcessing ? (
+                                <IconLoader className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <span>Eliminar</span>
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
+    )
+}
 
 function DragHandle({ id }: { id: string }) {
     const { attributes, listeners } = useSortable({
@@ -226,105 +315,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     },
     {
         id: "actions",
-        cell: ({ row }) => {
-            const [isDialogOpen, setIsDialogOpen] = useState(false)
-            const [isProcessing, setIsProcessing] = useState(false)
-
-            const handleEdit = () => {
-                // Abrir modal de edición con los datos actuales
-                toast.info(`Editando vehículo ${row.original.plate}`)
-            }
-
-            const handleDelete = async () => {
-                setIsProcessing(true)
-                try {
-                    const csrfToken = getCsrfToken();
-                    const response = await fetch(`${API_URL}/vehicles/${row.original.plate}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken
-                        },
-                        credentials: 'include'
-                    })
-
-                    if (!response.ok) throw new Error(await response.text())
-
-                    toast.success(`Vehículo ${row.original.plate} eliminado correctamente`)
-                    return true
-                } catch (error) {
-                    toast.error(error instanceof Error ? error.message : 'Error al eliminar vehículo')
-                    return false
-                } finally {
-                    setIsProcessing(false)
-                    setIsDialogOpen(false)
-                }
-            }
-
-            return (
-                <>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-                                size="icon"
-                            >
-                                <IconDotsVertical />
-                                <span className="sr-only">Abrir menú</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem onClick={handleEdit}>
-                                <span>Editar</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() => setIsDialogOpen(true)}
-                                className="text-destructive focus:text-destructive"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <IconTrash className="h-4 w-4" />
-                                    <span>Eliminar</span>
-                                </div>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    {/* Diálogo de confirmación para eliminar */}
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Confirmar eliminación</DialogTitle>
-                                <DialogDescription>
-                                    ¿Estás seguro de eliminar el vehículo con placa {row.original.plate}? Esta acción no se puede deshacer.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex justify-end gap-2 mt-4">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setIsDialogOpen(false)}
-                                    disabled={isProcessing}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    onClick={handleDelete}
-                                    disabled={isProcessing}
-                                    variant="destructive"
-                                >
-                                    {isProcessing ? (
-                                        <IconLoader className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <span>Eliminar</span>
-                                    )}
-                                </Button>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-                </>
-            )
-        }
+        cell: ActionsCell
     }
 ]
 
@@ -610,95 +601,5 @@ export function DataTable({
                 <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
             </TabsContent>
         </Tabs>
-    )
-}
-
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-    const isMobile = useIsMobile()
-
-    return (
-        <Drawer direction={isMobile ? "bottom" : "right"}>
-            <DrawerTrigger asChild>
-                <Button variant="link" className="text-foreground w-fit px-0 text-left">
-                    {item.brand} {item.model} - {item.plate}
-                </Button>
-            </DrawerTrigger>
-            <DrawerContent>
-                <DrawerHeader className="gap-1">
-                    <DrawerTitle>Detalles del vehículo</DrawerTitle>
-                    <DrawerDescription>
-                        {item.brand} {item.model} - {item.plate}
-                    </DrawerDescription>
-                </DrawerHeader>
-                <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-                    <form className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="plate">Placa</Label>
-                            <Input
-                                id="plate"
-                                defaultValue={item.plate}
-                                readOnly
-                            />
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="brand">Marca</Label>
-                            <Input
-                                id="brand"
-                                defaultValue={item.brand}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="model">Modelo</Label>
-                            <Input
-                                id="model"
-                                defaultValue={item.model}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="color">Color</Label>
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="size-6 rounded-full border"
-                                    style={{ backgroundColor: item.color.toLowerCase() }}
-                                />
-                                <Input
-                                    id="color"
-                                    defaultValue={item.color}
-                                    className="flex-1"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="vehicle_type">Tipo de vehículo</Label>
-                            <Select defaultValue={item.vehicle_type}>
-                                <SelectTrigger id="vehicle_type" className="w-full">
-                                    <SelectValue placeholder="Seleccionar tipo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="coche">Coche</SelectItem>
-                                    <SelectItem value="moto">Motocicleta</SelectItem>
-                                    <SelectItem value="camion">Camión</SelectItem>
-                                    <SelectItem value="otro">Otro</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="owner_id">ID del dueño</Label>
-                            <Input
-                                id="owner_id"
-                                defaultValue={item.owner_id}
-                                readOnly
-                            />
-                        </div>
-                    </form>
-                </div>
-                <DrawerFooter>
-                    <Button>Guardar cambios</Button>
-                    <DrawerClose asChild>
-                        <Button variant="outline">Cancelar</Button>
-                    </DrawerClose>
-                </DrawerFooter>
-            </DrawerContent>
-        </Drawer>
     )
 }

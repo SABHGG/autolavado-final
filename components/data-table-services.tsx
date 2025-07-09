@@ -49,20 +49,8 @@ import {
 } from "@tanstack/react-table"
 import { toast } from "sonner"
 import { z } from "zod"
-
-import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-    Drawer,
-    DrawerClose,
-    DrawerContent,
-    DrawerDescription,
-    DrawerFooter,
-    DrawerHeader,
-    DrawerTitle,
-    DrawerTrigger,
-} from "@/components/ui/drawer"
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -70,7 +58,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
     Select,
@@ -91,20 +78,110 @@ import {
     Tabs,
     TabsContent,
 } from "@/components/ui/tabs"
-
+import { RowData } from '@tanstack/table-core';
 import { API_URL } from "@/config/config";
 import { getCsrfToken } from "@/lib/getcrfstoken"
 import { useRouter } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 
 export const schema = z.object({
-    id: z.string().uuid(),
+    id: z.number(),
     name: z.string(),
     price: z.number(),
     description: z.string(),
     duration: z.number(),
     is_active: z.boolean()
 })
+
+declare module '@tanstack/table-core' {
+    interface TableMeta<TData extends RowData> {
+        updateData: (rowIndex: number, columnId: keyof TData, value: TData[keyof TData]) => void
+    }
+}
+
+const ActionsCell = ({
+    row,
+    table,
+}: {
+    row: Row<z.infer<typeof schema>>;
+    table: ReturnType<typeof useReactTable<z.infer<typeof schema>>>;
+}) => {
+    const [isProcessing, setIsProcessing] = useState(false);
+    const service = row.original;
+
+    const toggleActiveStatus = async () => {
+        setIsProcessing(true);
+        try {
+            const csrfToken = getCsrfToken();
+            const response = await fetch(`${API_URL}/services/${service.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || ''
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    is_active: !service.is_active
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(await response.text());
+            }
+
+            table.options.meta?.updateData(row.index, 'is_active', !service.is_active);
+
+            toast.success(
+                `Servicio ${service.name} ${!service.is_active ? 'activado' : 'desactivado'} correctamente`
+            );
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : `Error al ${service.is_active ? 'desactivar' : 'activar'} servicio`
+            );
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-4">
+            {/* Switch para activar/desactivar */}
+            <div className="flex items-center gap-2">
+                <Switch
+                    checked={service.is_active}
+                    onCheckedChange={toggleActiveStatus}
+                    disabled={isProcessing}
+                />
+                <span className="text-sm font-medium">
+                    {service.is_active ? 'Activo' : 'Inactivo'}
+                </span>
+            </div>
+
+            {/* Menú de acciones adicionales */}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={isProcessing}>
+                        <IconDotsVertical className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={toggleActiveStatus}>
+                        <div className="flex items-center gap-2">
+                            {service.is_active ? (
+                                <IconPower className="h-4 w-4 text-yellow-500" />
+                            ) : (
+                                <IconCheck className="h-4 w-4 text-green-500" />
+                            )}
+                            <span>{service.is_active ? 'Desactivar' : 'Activar'}</span>
+                        </div>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    );
+};
 
 function DragHandle({ id }: { id: string }) {
     const { attributes, listeners } = useSortable({
@@ -129,7 +206,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     {
         id: "drag",
         header: () => null,
-        cell: ({ row }) => <DragHandle id={row.original.id} />,
+        cell: ({ row }) => <DragHandle id={row.original.id.toString()} />,
     },
     {
         id: "select",
@@ -212,83 +289,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     },
     {
         id: "actions",
-        cell: ({ row, table }) => {
-            const [isProcessing, setIsProcessing] = useState(false);
-            const service = row.original;
-
-            const toggleActiveStatus = async () => {
-                setIsProcessing(true);
-                try {
-                    const csrfToken = getCsrfToken();
-                    const response = await fetch(`${API_URL}/services/${service.id}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': csrfToken || ''
-                        },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            is_active: !service.is_active  // Solo enviamos este campo
-                        }),
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(await response.text());
-                    }
-
-                    table.options.meta?.updateData(row.index, 'is_active', !service.is_active);
-
-                    toast.success(
-                        `Servicio ${service.name} ${!service.is_active ? 'activado' : 'desactivado'} correctamente`
-                    );
-                } catch (error) {
-                    toast.error(
-                        error instanceof Error
-                            ? error.message
-                            : `Error al ${service.is_active ? 'desactivar' : 'activar'} servicio`
-                    );
-                } finally {
-                    setIsProcessing(false);
-                }
-            };
-
-            return (
-                <div className="flex items-center gap-4">
-                    {/* Switch para activar/desactivar */}
-                    <div className="flex items-center gap-2">
-                        <Switch
-                            checked={service.is_active}
-                            onCheckedChange={toggleActiveStatus}
-                            disabled={isProcessing}
-                        />
-                        <span className="text-sm font-medium">
-                            {service.is_active ? 'Activo' : 'Inactivo'}
-                        </span>
-                    </div>
-
-                    {/* Menú de acciones adicionales */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={isProcessing}>
-                                <IconDotsVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={toggleActiveStatus}>
-                                <div className="flex items-center gap-2">
-                                    {service.is_active ? (
-                                        <IconPower className="h-4 w-4 text-yellow-500" />
-                                    ) : (
-                                        <IconCheck className="h-4 w-4 text-green-500" />
-                                    )}
-                                    <span>{service.is_active ? 'Desactivar' : 'Activar'}</span>
-                                </div>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            )
-        }
+        cell: ActionsCell
     }
 ]
 
@@ -358,7 +359,7 @@ export function ServicesTable({
             columnFilters,
             pagination,
         },
-        getRowId: (row) => row.id,
+        getRowId: (row) => row.id.toString(),
         enableRowSelection: true,
         onRowSelectionChange: setRowSelection,
         onSortingChange: setSorting,
@@ -372,7 +373,7 @@ export function ServicesTable({
         getFacetedRowModel: getFacetedRowModel(),
         getFacetedUniqueValues: getFacetedUniqueValues(),
         meta: {
-            updateData: (rowIndex: number, key: keyof Service, value: any) => {
+            updateData: (rowIndex: number, key: keyof Service, value: Service[keyof Service]) => {
                 setData((old) =>
                     old.map((row, index) =>
                         index === rowIndex ? { ...row, [key]: value } : row
@@ -578,95 +579,5 @@ export function ServicesTable({
                 </div>
             </TabsContent>
         </Tabs>
-    )
-}
-
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-    const isMobile = useIsMobile()
-
-    return (
-        <Drawer direction={isMobile ? "bottom" : "right"}>
-            <DrawerTrigger asChild>
-                <Button variant="link" className="text-foreground w-fit px-0 text-left">
-                    {item.brand} {item.model} - {item.plate}
-                </Button>
-            </DrawerTrigger>
-            <DrawerContent>
-                <DrawerHeader className="gap-1">
-                    <DrawerTitle>Detalles del vehículo</DrawerTitle>
-                    <DrawerDescription>
-                        {item.brand} {item.model} - {item.plate}
-                    </DrawerDescription>
-                </DrawerHeader>
-                <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-                    <form className="flex flex-col gap-4">
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="plate">Placa</Label>
-                            <Input
-                                id="plate"
-                                defaultValue={item.plate}
-                                readOnly
-                            />
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="brand">Marca</Label>
-                            <Input
-                                id="brand"
-                                defaultValue={item.brand}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="model">Modelo</Label>
-                            <Input
-                                id="model"
-                                defaultValue={item.model}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="color">Color</Label>
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="size-6 rounded-full border"
-                                    style={{ backgroundColor: item.color.toLowerCase() }}
-                                />
-                                <Input
-                                    id="color"
-                                    defaultValue={item.color}
-                                    className="flex-1"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="vehicle_type">Tipo de vehículo</Label>
-                            <Select defaultValue={item.vehicle_type}>
-                                <SelectTrigger id="vehicle_type" className="w-full">
-                                    <SelectValue placeholder="Seleccionar tipo" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="coche">Coche</SelectItem>
-                                    <SelectItem value="moto">Motocicleta</SelectItem>
-                                    <SelectItem value="camion">Camión</SelectItem>
-                                    <SelectItem value="otro">Otro</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            <Label htmlFor="owner_id">ID del dueño</Label>
-                            <Input
-                                id="owner_id"
-                                defaultValue={item.owner_id}
-                                readOnly
-                            />
-                        </div>
-                    </form>
-                </div>
-                <DrawerFooter>
-                    <Button>Guardar cambios</Button>
-                    <DrawerClose asChild>
-                        <Button variant="outline">Cancelar</Button>
-                    </DrawerClose>
-                </DrawerFooter>
-            </DrawerContent>
-        </Drawer>
     )
 }

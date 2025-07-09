@@ -41,7 +41,7 @@ export interface Vehicle {
 
 // Servicio
 export interface Service {
-  id?: string;
+  id?: number;
   name: string;
   price: number;
   description: string;

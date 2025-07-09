@@ -29,7 +29,10 @@ const ServicePage = () => {
     }
     return (
         <ServicesTable
-            data={data}
+            data={data.map(item => ({
+                ...item,
+                id: item.id ?? 0
+            }))}
         />
     )
 }

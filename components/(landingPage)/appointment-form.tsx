@@ -10,6 +10,11 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 
+async function bookAppointment(): Promise<{ success: boolean }> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return { success: true };
+}
+
 const formSchema = z.object({
     name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
     email: z.string().email('Correo electrónico inválido'),
@@ -39,7 +44,7 @@ export default function AppointmentForm() {
         const formData = new FormData()
         Object.entries(values).forEach(([key, value]) => formData.append(key, value))
 
-        const result = await bookAppointment(formData)
+        const result = await bookAppointment()
 
         setIsSubmitting(false)
 
