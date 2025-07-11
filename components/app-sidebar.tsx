@@ -1,6 +1,6 @@
 "use client"
 import * as React from "react"
-import { useUser } from "@/hooks/useUser"
+import { useAuth } from "@/context/AuthContext";
 import {
   Car,
   CalendarCheck,
@@ -20,13 +20,6 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-
-type User = {
-  username?: string
-  email?: string
-  role?: string
-}
-
 
 const navClient = [
   {
@@ -118,8 +111,7 @@ const navAdmin = [
 
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const user = useUser() as User | null | undefined
-
+  const { user } = useAuth()
   const data = {
     user: {
       name: user?.username ?? "",

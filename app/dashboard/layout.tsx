@@ -14,9 +14,11 @@ import { Separator } from "@/components/ui/separator"
 import {
     SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { useProtectedPage } from "@/hooks/useProtectedPage";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const breadcrumbs = useBreadcrumbs();
+    useProtectedPage();
 
     function capitalize(text: string) {
         return text.charAt(0).toUpperCase() + text.slice(1)

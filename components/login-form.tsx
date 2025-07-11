@@ -5,12 +5,14 @@ import * as z from "zod"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { API_URL } from "@/config/config"
+import { useAuth } from "@/context/AuthContext";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { cn } from "@/lib/utils"
+import { useEffect } from "react"
 
 
 const loginSchema = z.object({
@@ -22,7 +24,15 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const router = useRouter()
+  const { user, isAuthenticated, loading, checkAuth, getDefaultRouteForRole } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      const fallback = getDefaultRouteForRole(user?.role || "");
+      router.replace(fallback);
+    }
+  }, [loading, isAuthenticated, user, router, getDefaultRouteForRole]);
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -47,6 +57,12 @@ export function LoginForm({
 
       const result = await res.json()
       toast.dismiss() // cierra el loading
+
+      if (res.ok) {
+        await checkAuth(); // ya redirige automáticamente desde el efecto
+      } else {
+        toast.error("Credenciales inválidas");
+      }
 
       if (!res.ok) {
         form.setError("password", { message: result.message || "Credenciales inválidas" })
