@@ -1,5 +1,4 @@
 "use client"
-
 import { useRouter } from "next/navigation"
 import {
   BadgeCheck,
@@ -30,8 +29,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { toast } from "sonner"
-import { API_URL } from "@/config/config"
+import { useAuth } from "@/context/AuthContext";
 
 
 export function NavUser({
@@ -45,32 +43,12 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const { logOut } = useAuth()
 
   const handleLogout = async () => {
-    const toastId = toast.loading("Cerrando sesión...")
-
-    try {
-      const res = await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      })
-
-      toast.dismiss(toastId)
-
-      if (!res.ok) {
-        toast.error("Error al cerrar sesión")
-        return
-      }
-
-      toast.success("Sesión cerrada correctamente")
-      router.push("/")
-    } catch (error) {
-      toast.dismiss(toastId)
-      toast.error("Error de conexión al cerrar sesión")
-      console.error("Logout error:", error)
-    }
+    await logOut();
+    router.push("/login");
   }
-
 
   return (
     <SidebarMenu>

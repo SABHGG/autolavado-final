@@ -1,6 +1,6 @@
 "use client"
 import { createContext, useContext, useEffect, useState } from "react";
-
+import { toast } from "sonner"
 import { API_URL } from "@/config/config";
 import { User } from "@/types/types";
 
@@ -12,6 +12,7 @@ interface AuthContextProps {
     checkAuth: () => void;
     canAccess: (path: string) => boolean;
     getDefaultRouteForRole: (role: string) => string
+    logOut: () => void
 }
 
 const USER_ALLOWED_ROUTES = ["/dashboard/appointments", "/dashboard/vehicles"];
@@ -22,7 +23,8 @@ const AuthContext = createContext<AuthContextProps>({
     isAuthenticated: false,
     checkAuth: () => { },
     canAccess: () => false,
-    getDefaultRouteForRole: () => "/"
+    getDefaultRouteForRole: () => "/",
+    logOut: () => { }
 
 });
 
@@ -71,6 +73,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return "/";
     };
 
+    const logOut = async () => {
+
+        const toastId = toast.loading("Cerrando sesión...");
+        try {
+            const res = await fetch(`${API_URL}/auth/logout`, {
+                method: "POST",
+                credentials: "include",
+            });
+
+            toast.dismiss(toastId);
+
+            if (!res.ok) {
+                toast.error("Error al cerrar sesión");
+                return;
+            }
+
+            setUser(null);
+            toast.success("Sesión cerrada correctamente");
+        } catch (error) {
+            toast.dismiss(toastId);
+            toast.error("Error de conexión al cerrar sesión");
+            console.error("Logout error:", error);
+        }
+    }
+
     useEffect(() => {
         checkAuth();
     }, []);
@@ -83,7 +110,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 isAuthenticated: !!user,
                 checkAuth,
                 canAccess,
-                getDefaultRouteForRole
+                getDefaultRouteForRole,
+                logOut,
             }}
         >
             {children}
@@ -91,4 +119,4 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext)
