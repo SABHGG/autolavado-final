@@ -33,12 +33,16 @@ export function SectionCards({
                 <CardHeader>
                     <CardDescription>Citas Hoy</CardDescription>
                     <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                        {appointments_today}
+                        {
+                            appointments_today === 0
+                                ? "Sin citas"
+                                : appointments_today.toLocaleString("es-CO")
+                        }
                     </CardTitle>
                     <CardAction>
                         <Badge variant="outline">
                             <IconTrendingUp />
-                            +1 cita
+                            {appointments_today === 0 ? "Ninguna cita" : `+${appointments_today} citas`}
                         </Badge>
                     </CardAction>
                 </CardHeader>
@@ -54,12 +58,20 @@ export function SectionCards({
                 <CardHeader>
                     <CardDescription>Ingresos Hoy</CardDescription>
                     <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                        ${income_today.toLocaleString("es-CO")}
+                        ${
+                            income_today === 0
+                                ? "Sin ingresos"
+                                : income_today.toLocaleString("es-CO")
+                        }
                     </CardTitle>
                     <CardAction>
                         <Badge variant="outline">
                             <IconTrendingUp />
-                            +${income_today.toLocaleString("es-CO")}
+                            +${
+                                income_today === 0
+                                    ? "0"
+                                    : income_today.toLocaleString("es-CO")
+                            }
                         </Badge>
                     </CardAction>
                 </CardHeader>
@@ -75,12 +87,19 @@ export function SectionCards({
                 <CardHeader>
                     <CardDescription>Servicio Más Solicitado</CardDescription>
                     <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-                        {most_requested_service.name}
+                        {
+                            most_requested_service.name || "Ninguno"
+                        }
                     </CardTitle>
                     <CardAction>
                         <Badge variant="outline">
                             <IconTrendingUp />
-                            {most_requested_service.count} vez
+                            {
+                                most_requested_service.count === 0
+                                    ? "Ninguno"
+                                    : most_requested_service.count.toLocaleString("es-CO")
+                            } {most_requested_service.count === 1 ? "vez" : "veces"
+                            }
                         </Badge>
                     </CardAction>
                 </CardHeader>
