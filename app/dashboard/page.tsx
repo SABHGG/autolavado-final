@@ -26,8 +26,11 @@ export default function Page() {
       }
       return response.json();
     }).then(data => {
-      setData(data);
-
+      setData({
+        appointments_today: data.appointments_today || 0,
+        income_today: data.income_today || 0,
+        most_requested_service: data.most_requested_service ?? { name: "", count: 0 }
+      })
       setLoading(false);
     }).catch(error => {
       console.error('There was a problem with the fetch operation:', error);
