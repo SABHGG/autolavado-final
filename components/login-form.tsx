@@ -111,7 +111,7 @@ export function LoginForm({
                     <div className="flex items-center justify-between">
                       <FormLabel>Contraseña</FormLabel>
                       <a
-                        href="/recover"
+                        href="/reset-password"
                         className="text-sm underline-offset-4 hover:underline"
                       >
                         ¿Olvidaste tu contraseña?

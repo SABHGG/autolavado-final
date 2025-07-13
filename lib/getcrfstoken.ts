@@ -1,6 +1,7 @@
 export function getCsrfToken() {
-  const match = document.cookie
+  const csrfMatch = document.cookie
     .split("; ")
-    .find((row) => row.startsWith("csrf_access_token="));
-  return match?.split("=")[1];
+    .find((cookie) => cookie.startsWith("csrf_access_token="));
+
+  return csrfMatch ? csrfMatch.split("=")[1] : null;
 }

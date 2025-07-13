@@ -207,8 +207,8 @@ export function NewAppointmentForm({
                                                 <SelectValue placeholder="Selecciona hora" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {Array.from({ length: 10 }, (_, i) => {
-                                                    const hour = 8 + i
+                                                {Array.from({ length: 24 }, (_, i) => {
+                                                    const hour = 0 + i
                                                     return [`${hour}:00`, `${hour}:30`]
                                                 })
                                                     .flat()
