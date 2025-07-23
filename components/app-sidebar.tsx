@@ -86,7 +86,7 @@ const navAdmin = [
     icon: CalendarCheck,
     items: [
       { title: "Todas las Citas", url: "/dashboard/appointments" },
-      { title: "Citas Asignadas", url: "/dashboard/appointments/assigned" },
+      { title: "Registar Citas", url: "/dashboard/appointments/admin" },
     ],
   },
   {

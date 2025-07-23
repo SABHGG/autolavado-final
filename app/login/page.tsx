@@ -1,11 +1,16 @@
+import Header from "@/components/(landingPage)/header"
 import { LoginForm } from "@/components/login-form"
 
 export default function Page() {
   return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
+    <div className="flex flex-col justify-between min-h-svh bg-background">
+      <Header />
+      <div className="w-full max-w-sm mx-auto p-6 md:p-10">
         <LoginForm />
       </div>
+      <footer className="py-6 text-center text-sm text-muted-foreground">
+        © 2024 AutoLavado Exprés. Todos los derechos reservados.
+      </footer>
     </div>
   )
 }

@@ -28,20 +28,20 @@ export interface UserUpdate {
 
 // Vehículo
 export interface Vehicle {
-  id?: string;
+  id: string;
   plate: string;
   brand: string;
   model: string;
   color: string;
   vehicle_type: "motocicleta" | "coche" | "camion" | "autobus" | "furgoneta";
-  owner_id?: string;
+  owner_id: string;
   updated_at: string;
   created_at: string;
 }
 
 // Servicio
 export interface Service {
-  id?: number;
+  id: number;
   name: string;
   price: number;
   description: string;
@@ -60,14 +60,14 @@ export interface AppointmentService {
 }
 
 export interface Appointment {
-  id?: string;
+  id: string;
   appointment_time: string;
   status: "pendiente" | "en_progreso" | "completada" | "cancelada";
   user_id: string;
   vehicle_id: string;
   services: AppointmentService[];
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Reporte de ventas

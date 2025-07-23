@@ -8,28 +8,21 @@ import {
     TouchSensor,
     useSensor,
     useSensors,
-    type DragEndEvent,
     type UniqueIdentifier,
 } from "@dnd-kit/core"
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
 import {
-    arrayMove,
     SortableContext,
     useSortable,
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
-    IconChevronDown,
-    IconChevronLeft,
-    IconChevronRight,
-    IconChevronsLeft,
-    IconChevronsRight,
     IconDotsVertical,
     IconGripVertical,
-    IconLayoutColumns,
     IconLoader,
     IconPlus,
+    IconSearch,
     IconTrash
 } from "@tabler/icons-react"
 import {
@@ -53,20 +46,12 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
     DropdownMenu,
-    DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import {
     Table,
     TableBody,
@@ -79,7 +64,6 @@ import {
     Tabs,
     TabsContent,
 } from "@/components/ui/tabs"
-
 import {
     Dialog,
     DialogContent,
@@ -87,9 +71,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { PaginationControls } from "@/components/pagination-controls"
 import { API_URL } from "@/config/config";
 import { getCsrfToken } from "@/lib/getcrfstoken"
 import { useRouter } from "next/navigation"
+import { Input } from "./ui/input"
 
 export const schema = z.object({
     id: z.string().uuid(),
@@ -98,6 +84,18 @@ export const schema = z.object({
     phone: z.string(),
     role: z.string(),
 })
+
+interface DataTableProps {
+    data: z.infer<typeof schema>[];
+    totalCount: number;
+    pageIndex: number;
+    pageSize: number;
+    searchTerm?: string;
+    onPageChange: (pageIndex: number) => void;
+    onPageSizeChange: (pageSize: number) => void;
+    setPageIndex?: (pageIndex: number) => void;
+    setSearchTerm?: (term: string) => void;
+}
 
 const ActionsCell = ({
     row,
@@ -306,11 +304,17 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
 }
 
 export function UsersTable({
-    data: initialData,
-}: {
-    data: z.infer<typeof schema>[]
-}) {
-    const [data, setData] = useState(() => initialData)
+    data: data,
+    totalCount,
+    pageIndex,
+    pageSize,
+    searchTerm = '',
+    onPageChange,
+    onPageSizeChange,
+    setSearchTerm,
+    setPageIndex
+
+}: DataTableProps) {
     const [rowSelection, setRowSelection] = useState({})
     const [columnVisibility, setColumnVisibility] =
         useState<VisibilityState>({})
@@ -361,66 +365,45 @@ export function UsersTable({
 
     const router = useRouter()
 
-    function handleDragEnd(event: DragEndEvent) {
-        const { active, over } = event
-        if (active && over && active.id !== over.id) {
-            setData((data) => {
-                const oldIndex = dataIds.indexOf(active.id)
-                const newIndex = dataIds.indexOf(over.id)
-                return arrayMove(data, oldIndex, newIndex)
-            })
-        }
-    }
-
     return (
         <Tabs defaultValue="usuarios" className="w-full flex-col justify-start gap-6">
             <div className="flex items-center justify-end px-4 lg:px-6">
                 <Label htmlFor="view-selector" className="sr-only">
                     Vista
                 </Label>
-                <div className="flex items-center gap-2 ">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <IconLayoutColumns />
-                                <span className="hidden lg:inline">Personalizar columnas</span>
-                                <span className="lg:hidden">Columnas</span>
-                                <IconChevronDown />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            {table
-                                .getAllColumns()
-                                .filter(
-                                    (column) =>
-                                        typeof column.accessorFn !== "undefined" &&
-                                        column.getCanHide()
-                                )
-                                .map((column) => {
-                                    return (
-                                        <DropdownMenuCheckboxItem
-                                            key={column.id}
-                                            className="capitalize"
-                                            checked={column.getIsVisible()}
-                                            onCheckedChange={(value) =>
-                                                column.toggleVisibility(!!value)
-                                            }
-                                        >
-                                            {column.id === "username" ? "Nombre de usuario" :
-                                                column.id === "email" ? "Correo electrónico" :
-                                                    column.id === "phone" ? "Teléfono" :
-                                                        column.id === "role" ? "Rol" : column.id}
-                                        </DropdownMenuCheckboxItem>
-                                    )
-                                })}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/users/new")}>
-                        <IconPlus />
-                        <span className="hidden lg:inline">Nuevo usuario</span>
-                    </Button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full">
+                    {/* Barra de búsqueda - Ocupa todo el ancho en móvil */}
+                    <div className="w-full sm:flex-1 min-w-0"> {/* min-w-0 evita desbordamiento */}
+                        <div className="relative w-full">
+                            <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                type="search"
+                                placeholder="Buscar usuarios por nombre o correo electrónico..."
+                                value={searchTerm}
+                                onChange={(e) => {
+                                    if (setSearchTerm) setSearchTerm(e.target.value)
+                                    if (setPageIndex) setPageIndex(0) // Resetear a primera página al buscar
+                                }}
+                                className="w-full pl-9 h-9 text-sm"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Botón - Se ajusta automáticamente en desktop */}
+                    <div className="w-full sm:w-auto flex-shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push("/dashboard/users/new")}
+                            className="w-full sm:w-auto h-9"
+                        >
+                            <IconPlus className="mr-2 h-4 w-4" />
+                            <span className="whitespace-nowrap">Nuevo usuario</span>
+                        </Button>
+                    </div>
                 </div>
             </div>
+
             <TabsContent
                 value="usuarios"
                 className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
@@ -429,7 +412,6 @@ export function UsersTable({
                     <DndContext
                         collisionDetection={closestCenter}
                         modifiers={[restrictToVerticalAxis]}
-                        onDragEnd={handleDragEnd}
                         sensors={sensors}
                         id={sortableId}
                     >
@@ -476,83 +458,20 @@ export function UsersTable({
                         </Table>
                     </DndContext>
                 </div>
-                <div className="flex items-center justify-between px-4">
-                    <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-                        {table.getFilteredSelectedRowModel().rows.length} de{" "}
-                        {table.getFilteredRowModel().rows.length} fila(s) seleccionada(s).
-                    </div>
-                    <div className="flex w-full items-center gap-8 lg:w-fit">
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                                Filas por página
-                            </Label>
-                            <Select
-                                value={`${table.getState().pagination.pageSize}`}
-                                onValueChange={(value) => {
-                                    table.setPageSize(Number(value))
-                                }}
-                            >
-                                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                                    <SelectValue
-                                        placeholder={table.getState().pagination.pageSize}
-                                    />
-                                </SelectTrigger>
-                                <SelectContent side="top">
-                                    {[10, 20, 30, 40, 50].map((pageSize) => (
-                                        <SelectItem key={pageSize} value={`${pageSize}`}>
-                                            {pageSize}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex w-fit items-center justify-center text-sm font-medium">
-                            Página {table.getState().pagination.pageIndex + 1} de{" "}
-                            {table.getPageCount()}
-                        </div>
-                        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-                            <Button
-                                variant="outline"
-                                className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <span className="sr-only">Ir a la primera página</span>
-                                <IconChevronsLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                size="icon"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <span className="sr-only">Ir a la página anterior</span>
-                                <IconChevronLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                size="icon"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <span className="sr-only">Ir a la página siguiente</span>
-                                <IconChevronRight />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="hidden size-8 lg:flex"
-                                size="icon"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <span className="sr-only">Ir a la última página</span>
-                                <IconChevronsRight />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <PaginationControls
+                    pageIndex={pageIndex}
+                    pageSize={pageSize}
+                    totalCount={totalCount}
+                    entityName="usuarios"
+                    onPageChange={(page) => {
+                        table.setPageIndex(page)
+                        onPageChange(page)
+                    }}
+                    onPageSizeChange={(size) => {
+                        table.setPageSize(size)
+                        onPageSizeChange(size)
+                    }}
+                />
             </TabsContent>
         </Tabs>
     )

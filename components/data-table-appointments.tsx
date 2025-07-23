@@ -1,5 +1,5 @@
 "use client"
-import * as React from "react"
+import { useState, useEffect, useMemo, useId, cloneElement } from "react"
 import {
     closestCenter,
     DndContext,
@@ -8,12 +8,10 @@ import {
     TouchSensor,
     useSensor,
     useSensors,
-    type DragEndEvent,
     type UniqueIdentifier,
 } from "@dnd-kit/core"
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers"
 import {
-    arrayMove,
     SortableContext,
     useSortable,
     verticalListSortingStrategy,
@@ -22,16 +20,11 @@ import { CSS } from "@dnd-kit/utilities"
 import {
     IconCalendar,
     IconCar,
-    IconChevronDown,
-    IconChevronLeft,
-    IconChevronRight,
-    IconChevronsLeft,
-    IconChevronsRight,
     IconCircleCheckFilled,
+    IconXboxXFilled,
     IconClock,
     IconDotsVertical,
     IconGripVertical,
-    IconLayoutColumns,
     IconLoader,
     IconPlus,
     IconProgress,
@@ -63,7 +56,6 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
     DropdownMenu,
-    DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -89,7 +81,6 @@ import {
     Tabs,
     TabsContent,
 } from "@/components/ui/tabs"
-
 import {
     Dialog,
     DialogContent,
@@ -104,6 +95,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import { PaginationControls } from "@/components/pagination-controls"
 import { API_URL } from "@/config/config";
 import { User } from "@/types/types"
 import { fetchEmployees } from "@/services/employees"
@@ -111,16 +103,25 @@ import { getCsrfToken } from "@/lib/getcrfstoken"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 
-
-
 export const schema = z.object({
     id: z.number(),
     appointment_time: z.string().datetime(),
     status: z.string(),
     user_id: z.string().uuid(),
     vehicle_id: z.string(),
-    created_at: z.string().datetime(),
 })
+
+type Appointment = z.infer<typeof schema>;
+
+interface DataTableProps {
+    data: Appointment[];
+    totalCount: number;
+    pageIndex: number;
+    pageSize: number;
+    onPageChange: (pageIndex: number) => void;
+    onPageSizeChange: (pageSize: number) => void;
+    onStatusFilterChange: (status: string | undefined) => void;
+}
 
 const ActionsCell = ({
     row,
@@ -128,21 +129,20 @@ const ActionsCell = ({
     row: Row<z.infer<typeof schema>>;
 }) => {
     const { user } = useAuth()
-    const [isAssignDialogOpen, setIsAssignDialogOpen] = React.useState(false)
-    const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = React.useState(false)
-    const [employees, setEmployees] = React.useState<User[]>([])
-    const [selectedEmployee, setSelectedEmployee] = React.useState("")
-    const [newAppointmentTime, setNewAppointmentTime] = React.useState(
+    const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+    const [isRescheduleDialogOpen, setIsRescheduleDialogOpen] = useState(false)
+    const [employees, setEmployees] = useState<User[]>([])
+    const [selectedEmployee, setSelectedEmployee] = useState("")
+    const [newAppointmentTime, setNewAppointmentTime] = useState(
         new Date(row.original.appointment_time)
     )
-    const [isLoadingEmployees, setIsLoadingEmployees] = React.useState(false)
+    const [isLoadingEmployees, setIsLoadingEmployees] = useState(false)
 
-    const [isDialogOpen, setIsDialogOpen] = React.useState(false)
-    const [selectedStatus, setSelectedStatus] = React.useState<AppointmentStatus | null>(null)
-    const [isProcessing, setIsProcessing] = React.useState(false)
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [selectedStatus, setSelectedStatus] = useState<AppointmentStatus | null>(null)
+    const [isProcessing, setIsProcessing] = useState(false)
 
-    // Cargar empleados cuando se abre el diálogo de asignación
-    React.useEffect(() => {
+    useEffect(() => {
         if (isAssignDialogOpen && employees.length === 0) {
             const loadEmployees = async () => {
                 setIsLoadingEmployees(true)
@@ -162,13 +162,11 @@ const ActionsCell = ({
     const csrfToken = getCsrfToken();
     type AppointmentStatus = 'pendiente' | 'en_progreso' | 'completada' | 'cancelada'
 
-    // Función para formatear la fecha en formato compatible con Python datetime
     const formatForBackend = (date: Date) => {
-        return date.toISOString().replace('Z', '') // Elimina la Z final para compatibilidad
+        return date.toISOString().replace('Z', '')
     }
 
     const handleEdit = () => {
-        // Abrir modal de edición con los datos actuales
         toast.info(`Editando cita #${row.original.id}`)
     }
 
@@ -196,7 +194,7 @@ const ActionsCell = ({
                     'X-CSRF-TOKEN': csrfToken || ''
                 },
                 body: JSON.stringify({
-                    employee_id: selectedEmployee // Ahora usa el ID del empleado real
+                    employee_id: selectedEmployee
                 }),
                 credentials: 'include'
             })
@@ -348,7 +346,6 @@ const ActionsCell = ({
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Diálogo para asignar técnico - Modificado para usar empleados reales */}
             <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -412,7 +409,6 @@ const ActionsCell = ({
                 </DialogContent>
             </Dialog>
 
-            {/* Diálogo para reprogramar */}
             <Dialog open={isRescheduleDialogOpen} onOpenChange={setIsRescheduleDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -463,11 +459,16 @@ const ActionsCell = ({
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"].map((time) => (
-                                                    <SelectItem key={time} value={time}>
-                                                        {time}
-                                                    </SelectItem>
-                                                ))}
+                                                {Array.from({ length: 24 }, (_, i) => {
+                                                    const hour = 0 + i
+                                                    return [`${hour}:00`, `${hour}:30`]
+                                                })
+                                                    .flat()
+                                                    .map((time) => (
+                                                        <SelectItem key={time} value={time}>
+                                                            {time}
+                                                        </SelectItem>
+                                                    ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -489,7 +490,6 @@ const ActionsCell = ({
                 </DialogContent>
             </Dialog>
 
-            {/* Diálogo para cambiar el estado */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -602,24 +602,56 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         header: "Estado",
         cell: ({ row }) => {
             const status = row.original.status as 'pendiente' | 'en_progreso' | 'completada' | 'cancelada';
-            const statusLabels: Record<'pendiente' | 'en_progreso' | 'completada' | 'cancelada', string> = {
-                pendiente: "Pendiente",
-                en_progreso: "En progreso",
-                completada: "Completada",
-                cancelada: "Cancelada",
-            };
 
-            const statusIcons: Record<'pendiente' | 'en_progreso' | 'completada' | 'cancelada', React.ReactNode> = {
-                pendiente: <IconLoader className="mr-1 size-3" />,
-                en_progreso: <IconLoader className="mr-1 size-3 animate-spin" />,
-                completada: <IconCircleCheckFilled className="mr-1 size-3" />,
-                cancelada: <IconCircleCheckFilled className="mr-1 size-3 text-red-500" />,
+            // Configuración centralizada de estilos
+            const statusConfig = {
+                pendiente: {
+                    label: "Pendiente",
+                    icon: <IconClock className="mr-1.5 size-3.5" />,
+                    variant: "outline",
+                    class: "border-amber-300 text-amber-800 bg-amber-50",
+                    iconClass: "text-amber-500"
+                },
+                en_progreso: {
+                    label: "En progreso",
+                    icon: <IconProgress className="mr-1.5 size-3.5 animate-pulse" />,
+                    variant: "default",
+                    class: "border-blue-300 text-blue-800 bg-blue-50",
+                    iconClass: "text-blue-500"
+                },
+                completada: {
+                    label: "Completada",
+                    icon: <IconCircleCheckFilled className="mr-1.5 size-3.5" />,
+                    variant: "default",
+                    class: "border-emerald-300 text-emerald-800 bg-emerald-50",
+                    iconClass: "text-emerald-500"
+                },
+                cancelada: {
+                    label: "Cancelada",
+                    icon: <IconXboxXFilled className="mr-1.5 size-3.5" />,
+                    variant: "default",
+                    class: "border-red-300 text-red-800 bg-red-50",
+                    iconClass: "text-red-500"
+                }
+            } as const;
+
+            const currentStatus = statusConfig[status] || {
+                label: status,
+                icon: null,
+                variant: "outline",
+                class: ""
             };
 
             return (
-                <Badge variant={status === "pendiente" ? "outline" : "default"}>
-                    {statusIcons[status]}
-                    {statusLabels[status] || status}
+                <Badge
+                    variant={currentStatus.variant as "outline" | "default"}
+                    className={`inline-flex items-center py-1 ${currentStatus.class}`}
+                    aria-label={`Estado: ${currentStatus.label}`}
+                >
+                    {cloneElement(currentStatus.icon, {
+                        className: `${currentStatus.iconClass} ${currentStatus.icon.props.className || ''}`
+                    })}
+                    <span className="text-sm font-medium">{currentStatus.label}</span>
                 </Badge>
             );
         }
@@ -643,11 +675,6 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
                 {row.original.vehicle_id}
             </div>
         ),
-    },
-    {
-        accessorKey: "created_at",
-        header: "Creado el",
-        cell: ({ row }) => format(new Date(row.original.created_at), "PPPp", { locale: es }),
     },
     {
         id: "actions",
@@ -681,31 +708,39 @@ function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
 }
 
 export function DataTable({
-    data: initialData,
-}: {
-    data: z.infer<typeof schema>[]
-}) {
+    data,
+    totalCount,
+    pageIndex,
+    pageSize,
+    onPageChange,
+    onPageSizeChange,
+    onStatusFilterChange,
+}: DataTableProps) {
     const { user } = useAuth()
-    const [data, setData] = React.useState(() => initialData)
-    const [rowSelection, setRowSelection] = React.useState({})
+    const [rowSelection, setRowSelection] = useState({})
     const [columnVisibility, setColumnVisibility] =
-        React.useState<VisibilityState>({})
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+        useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(
         []
     )
-    const [sorting, setSorting] = React.useState<SortingState>([])
-    const [pagination, setPagination] = React.useState({
+    const [sorting, setSorting] = useState<SortingState>([])
+    const [pagination, setPagination] = useState({
         pageIndex: 0,
         pageSize: 10,
     })
-    const sortableId = React.useId()
+    const sortableId = useId()
     const sensors = useSensors(
         useSensor(MouseSensor, {}),
         useSensor(TouchSensor, {}),
         useSensor(KeyboardSensor, {})
     )
 
-    const dataIds = React.useMemo<UniqueIdentifier[]>(
+
+    useEffect(() => {
+        setPagination({ pageIndex, pageSize });
+    }, [pageIndex, pageSize]);
+
+    const dataIds = useMemo<UniqueIdentifier[]>(
         () => data?.map(({ id }) => id) || [],
         [data]
     )
@@ -722,31 +757,29 @@ export function DataTable({
         },
         getRowId: (row) => row.id.toString(),
         enableRowSelection: true,
+        manualPagination: true,
         onRowSelectionChange: setRowSelection,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
-        onPaginationChange: setPagination,
+        onPaginationChange: (updater) => {
+            if (typeof updater === 'function') {
+                const newPagination = updater(pagination);
+                onPageChange(newPagination.pageIndex);
+                onPageSizeChange(newPagination.pageSize);
+                setPagination(newPagination);
+            }
+        },
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFacetedRowModel: getFacetedRowModel(),
         getFacetedUniqueValues: getFacetedUniqueValues(),
+        pageCount: Math.ceil(totalCount / pagination.pageSize),
     })
 
     const router = useRouter()
-
-    function handleDragEnd(event: DragEndEvent) {
-        const { active, over } = event
-        if (active && over && active.id !== over.id) {
-            setData((data) => {
-                const oldIndex = dataIds.indexOf(active.id)
-                const newIndex = dataIds.indexOf(over.id)
-                return arrayMove(data, oldIndex, newIndex)
-            })
-        }
-    }
 
     return (
         <Tabs defaultValue="citas" className="w-full flex-col justify-start gap-6">
@@ -755,43 +788,23 @@ export function DataTable({
                     Vista
                 </Label>
                 <div className="flex items-center gap-2 ">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <IconLayoutColumns />
-                                <span className="hidden lg:inline">Personalizar columnas</span>
-                                <span className="lg:hidden">Columnas</span>
-                                <IconChevronDown />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            {table
-                                .getAllColumns()
-                                .filter(
-                                    (column) =>
-                                        typeof column.accessorFn !== "undefined" &&
-                                        column.getCanHide()
-                                )
-                                .map((column) => {
-                                    return (
-                                        <DropdownMenuCheckboxItem
-                                            key={column.id}
-                                            className="capitalize"
-                                            checked={column.getIsVisible()}
-                                            onCheckedChange={(value) =>
-                                                column.toggleVisibility(!!value)
-                                            }
-                                        >
-                                            {column.id === "appointment_time" ? "Fecha y Hora" :
-                                                column.id === "status" ? "Estado" :
-                                                    column.id === "created_at" ? "Creado el" :
-                                                        column.id === "user_id" ? "Usuario" :
-                                                            column.id === "vehicle_id" ? "Vehículo" : column.id}
-                                        </DropdownMenuCheckboxItem>
-                                    )
-                                })}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Select
+                        onValueChange={(value) => {
+                            onStatusFilterChange(value === "all" ? undefined : value);
+                            onPageChange(0);
+                        }}
+                    >
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Filtrar por estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="pendiente">Pendiente</SelectItem>
+                            <SelectItem value="en_progreso">En progreso</SelectItem>
+                            <SelectItem value="completada">Completada</SelectItem>
+                            <SelectItem value="cancelada">Cancelada</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Button variant="outline" size="sm" onClick={
                         user?.role === "admin" ? () => router.push("/dashboard/appointments/admin") : () => router.push("/dashboard/appointments/new")
                     }>
@@ -804,11 +817,11 @@ export function DataTable({
                 value="citas"
                 className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
             >
+
                 <div className="overflow-hidden rounded-lg border">
                     <DndContext
                         collisionDetection={closestCenter}
                         modifiers={[restrictToVerticalAxis]}
-                        onDragEnd={handleDragEnd}
                         sensors={sensors}
                         id={sortableId}
                     >
@@ -855,83 +868,21 @@ export function DataTable({
                         </Table>
                     </DndContext>
                 </div>
-                <div className="flex items-center justify-between px-4">
-                    <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-                        {table.getFilteredSelectedRowModel().rows.length} de{" "}
-                        {table.getFilteredRowModel().rows.length} fila(s) seleccionada(s).
-                    </div>
-                    <div className="flex w-full items-center gap-8 lg:w-fit">
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                                Filas por página
-                            </Label>
-                            <Select
-                                value={`${table.getState().pagination.pageSize}`}
-                                onValueChange={(value) => {
-                                    table.setPageSize(Number(value))
-                                }}
-                            >
-                                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                                    <SelectValue
-                                        placeholder={table.getState().pagination.pageSize}
-                                    />
-                                </SelectTrigger>
-                                <SelectContent side="top">
-                                    {[10, 20, 30, 40, 50].map((pageSize) => (
-                                        <SelectItem key={pageSize} value={`${pageSize}`}>
-                                            {pageSize}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex w-fit items-center justify-center text-sm font-medium">
-                            Página {table.getState().pagination.pageIndex + 1} de{" "}
-                            {table.getPageCount()}
-                        </div>
-                        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-                            <Button
-                                variant="outline"
-                                className="hidden h-8 w-8 p-0 lg:flex"
-                                onClick={() => table.setPageIndex(0)}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <span className="sr-only">Ir a la primera página</span>
-                                <IconChevronsLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                size="icon"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                <span className="sr-only">Ir a la página anterior</span>
-                                <IconChevronLeft />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="size-8"
-                                size="icon"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <span className="sr-only">Ir a la página siguiente</span>
-                                <IconChevronRight />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="hidden size-8 lg:flex"
-                                size="icon"
-                                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                <span className="sr-only">Ir a la última página</span>
-                                <IconChevronsRight />
-                            </Button>
-                        </div>
-                    </div>
-                </div>
+                <PaginationControls
+                    pageIndex={pageIndex}
+                    pageSize={pageSize}
+                    totalCount={totalCount}
+                    entityName="citas"
+                    onPageChange={(page) => {
+                        table.setPageIndex(page)
+                        onPageChange(page)
+                    }}
+                    onPageSizeChange={(size) => {
+                        table.setPageSize(size)
+                        onPageSizeChange(size)
+                    }}
+                />
+
             </TabsContent>
             <TabsContent value="historial" className="flex flex-col px-4 lg:px-6">
                 <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
@@ -939,6 +890,6 @@ export function DataTable({
             <TabsContent value="vehiculos" className="flex flex-col px-4 lg:px-6">
                 <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
             </TabsContent>
-        </Tabs>
+        </Tabs >
     )
 }

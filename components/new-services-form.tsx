@@ -49,7 +49,7 @@ export function NewServiceForm({
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setIsSubmitting(true)
         try {
-            const response = await fetch(`${API_URL}/services/`, {
+            const response = await fetch(`${API_URL}/services`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
