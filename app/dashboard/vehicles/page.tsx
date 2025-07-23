@@ -28,7 +28,7 @@ const VehiclePage = () => {
                     ...(searchTerm && { search: searchTerm })
                 });
 
-                const response = await fetch(`${API_URL}/vehicles?${params.toString()}`, {
+                const response = await fetch(`${API_URL}/vehicles/?${params.toString()}`, {
                     credentials: 'include'
                 });
 
