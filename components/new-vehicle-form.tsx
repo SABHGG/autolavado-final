@@ -178,18 +178,52 @@ export function NewVehicleForm({
                 <FormField
                     control={form.control}
                     name="color"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Color</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    placeholder="Ej: Rojo"
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
+                    render={({ field }) => {
+                        const colors = [
+                            { value: "rojo", label: "Rojo", bg: "bg-red-500" },
+                            { value: "azul", label: "Azul", bg: "bg-blue-500" },
+                            { value: "verde", label: "Verde", bg: "bg-green-500" },
+                            { value: "amarillo", label: "Amarillo", bg: "bg-yellow-500" },
+                            { value: "negro", label: "Negro", bg: "bg-black" },
+                            { value: "blanco", label: "Blanco", bg: "bg-white border" },
+                            { value: "gris", label: "Gris", bg: "bg-gray-500" },
+                            { value: "marron", label: "Marrón", bg: "bg-amber-900" },
+                            { value: "naranja", label: "Naranja", bg: "bg-orange-500" },
+                            { value: "otro", label: "Otro (especificar)", bg: "bg-gradient-to-r from-purple-500 to-pink-500" }
+                        ];
+
+                        return (
+                            <FormItem>
+                                <FormLabel>Color</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecciona un color" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {colors.map((color) => (
+                                            <SelectItem key={color.value} value={color.value}>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`h-4 w-4 rounded-full ${color.bg}`} />
+                                                    <span>{color.label}</span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {field.value === "otro" && (
+                                    <div className="mt-2">
+                                        <Input
+                                            placeholder="Especifica el color"
+                                            onChange={(e) => form.setValue("color", e.target.value)}
+                                        />
+                                    </div>
+                                )}
+                                <FormMessage />
+                            </FormItem>
+                        );
+                    }}
                 />
 
                 {/* Tipo de vehículo */}

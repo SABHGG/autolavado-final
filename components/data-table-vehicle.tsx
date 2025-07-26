@@ -279,31 +279,44 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         accessorKey: "color",
         header: "Color",
         cell: ({ row }) => {
-            // Map Spanish color names to valid CSS color values
-            const colorMap: Record<string, string> = {
-                rojo: "#ff0000",
-                azul: "#0000ff",
-                verde: "#008000",
+            const colorMap = {
+                rojo: "#ef4444",
+                azul: "#3b82f6",
+                verde: "#22c55e",
+                amarillo: "#eab308",
                 negro: "#000000",
                 blanco: "#ffffff",
-                gris: "#808080",
-                amarillo: "#ffff00",
-                naranja: "#ffa500",
-                marron: "#8b4513",
-                rosa: "#ffc0cb",
-                morado: "#800080",
+                gris: "#6b7280",
+                marron: "#78350f",
+                naranja: "#f97316",
+                otro: "linear-gradient(to right, #a855f7, #ec4899)"
             };
-            const colorValue = colorMap[row.original.color.toLowerCase()] || row.original.color;
+
+            const colorName = row.original.color.toLowerCase();
+            const isKnownColor = colorName in colorMap;
+            const isOther = colorName === "otro";
+            const isUnknown = !isKnownColor;
+
+            // Obtener el valor del color
+            const colorValue = isKnownColor ? colorMap[colorName as keyof typeof colorMap] : colorMap.otro;
+
             return (
                 <div className="flex items-center gap-2">
                     <div
                         className="size-4 rounded-full border"
-                        style={{ backgroundColor: colorValue }}
+                        style={isOther || isUnknown ? {
+                            background: colorMap.otro,
+                            backgroundColor: "transparent"
+                        } : {
+                            backgroundColor: colorValue
+                        }}
                     />
-                    {row.original.color}
+                    <span className="capitalize">
+                        {isKnownColor ? colorName : `${colorName} (otro)`}
+                    </span>
                 </div>
             );
-        },
+        }
     },
     {
         accessorKey: "vehicle_type",

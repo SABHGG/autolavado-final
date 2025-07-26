@@ -78,14 +78,26 @@ export function NewAppointmentForm({
     const [loadingServices, setLoadingServices] = useState(true)
     useEffect(() => {
         setLoadingServices(true)
-        fetch(`${API_URL}/services/`, { credentials: "include" })
-            .then((res) => {
-                if (!res.ok) throw new Error("Error al cargar servicios")
-                return res.json()
-            })
-            .then(setServices)
-            .catch(() => setServices([]))
-            .finally(() => setLoadingServices(false))
+        const loadServices = async () => {
+            try {
+                const response = await fetch(`${API_URL}/services`, {
+                    credentials: "include"
+                });
+
+                if (!response.ok) {
+                    throw new Error("Error al cargar vehículos");
+                }
+
+                const data = await response.json();
+                setServices(Array.isArray(data.data) ? data.data : []);
+            } catch (error) {
+                console.error("Error loading vehicles:", error);
+                setServices([]);
+            } finally {
+                setLoadingServices(false);
+            }
+        }
+        loadServices()
     }, [])
 
     // Fetch vehicles
@@ -104,7 +116,7 @@ export function NewAppointmentForm({
                 }
 
                 const data = await response.json();
-                setVehicles(Array.isArray(data) ? data : []);
+                setVehicles(Array.isArray(data.data) ? data.data : []);
                 setVehiclesError(null);
             } catch (error) {
                 console.error("Error loading vehicles:", error);
@@ -165,66 +177,77 @@ export function NewAppointmentForm({
                 <FormField
                     control={form.control}
                     name="appointment_time"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Fecha y Hora</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button
-                                            variant="outline"
-                                            className="pl-3 text-left font-normal"
-                                        >
-                                            {field.value ? (
-                                                format(field.value, "PPPp", { locale: es })
-                                            ) : (
-                                                <span>Selecciona una fecha</span>
-                                            )}
-                                            <IconCalendar className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) => date < new Date()}
-                                        initialFocus
-                                    />
-                                    <div className="px-4 pb-4">
-                                        <Select
-                                            value={format(field.value, "HH:mm")}
-                                            onValueChange={(time) => {
-                                                const [hours, minutes] = time.split(":")
-                                                const newDate = new Date(field.value)
-                                                newDate.setHours(Number(hours))
-                                                newDate.setMinutes(Number(minutes))
-                                                field.onChange(newDate)
-                                            }}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecciona hora" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Array.from({ length: 24 }, (_, i) => {
-                                                    const hour = 0 + i
-                                                    return [`${hour}:00`, `${hour}:30`]
-                                                })
-                                                    .flat()
-                                                    .map((time) => (
+                    render={({ field }) => {
+                        const handleTimeChange = (time: string) => {
+                            const [hours, minutes] = time.split(":");
+                            const newDate = new Date(field.value || new Date());
+                            newDate.setHours(Number(hours));
+                            newDate.setMinutes(Number(minutes));
+                            field.onChange(newDate);
+                        };
+
+                        const generateTimeSlots = () => {
+                            return Array.from({ length: 24 }, (_, hour) => [
+                                `${hour.toString().padStart(2, '0')}:00`,
+                                `${hour.toString().padStart(2, '0')}:30`
+                            ]).flat();
+                        };
+
+                        return (
+                            <FormItem className="flex flex-col space-y-2">
+                                <FormLabel className="font-medium">Fecha y Hora</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-between text-left font-normal"
+                                            >
+                                                {field.value ? (
+                                                    format(field.value, "PPPp", { locale: es })
+                                                ) : (
+                                                    <span className="text-muted-foreground">Selecciona una fecha</span>
+                                                )}
+                                                <IconCalendar className="ml-2 h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+
+                                    <PopoverContent className="w-auto p-0 space-y-4" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={field.onChange}
+                                            disabled={(date) =>
+                                                date < new Date(new Date().setHours(0, 0, 0, 0))
+                                            }
+                                            initialFocus
+                                            className="border-b"
+                                        />
+
+                                        <div className="px-4 pb-4">
+                                            <Select
+                                                value={field.value ? format(field.value, "HH:mm") : undefined}
+                                                onValueChange={handleTimeChange}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Selecciona hora" />
+                                                </SelectTrigger>
+                                                <SelectContent className="max-h-[200px] overflow-y-auto">
+                                                    {generateTimeSlots().map((time) => (
                                                         <SelectItem key={time} value={time}>
                                                             {time}
                                                         </SelectItem>
                                                     ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                        </FormItem>
-                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                            </FormItem>
+                        );
+                    }}
                 />
 
                 {/* Campo de Vehículo */}

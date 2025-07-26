@@ -40,7 +40,7 @@ import { toast } from "sonner"
 import { IconCalendar, IconCar, IconUser, IconLoader } from "@tabler/icons-react"
 import { API_URL } from "@/config/config"
 import { getCsrfToken } from "@/lib/getcrfstoken"
-import { ChevronsUpDown, Check } from "lucide-react"
+import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const formSchema = z.object({
@@ -72,6 +72,22 @@ interface Vehicle {
     model: string
 }
 
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
 export function NewAppointmentForm({
     onSuccess,
     onCancel,
@@ -94,43 +110,69 @@ export function NewAppointmentForm({
     const [loadingServices, setLoadingServices] = useState(true)
     useEffect(() => {
         setLoadingServices(true)
-        fetch(`${API_URL}/services/`, { credentials: "include" })
-            .then((res) => {
-                if (!res.ok) throw new Error("Error al cargar servicios")
-                return res.json()
-            })
-            .then(setServices)
-            .catch(() => setServices([]))
-            .finally(() => setLoadingServices(false))
+        const loadServices = async () => {
+            try {
+                const response = await fetch(`${API_URL}/services`, {
+                    credentials: "include"
+                });
+
+                if (!response.ok) {
+                    throw new Error("Error al cargar vehículos");
+                }
+
+                const data = await response.json();
+                setServices(Array.isArray(data.data) ? data.data : []);
+                setLoadingServices(false);
+            } catch (error) {
+                console.error("Error loading vehicles:", error);
+                setServices([]);
+            } finally {
+                setLoadingServices(false);
+            }
+        }
+        loadServices()
     }, [])
 
     // Users state
     const [users, setUsers] = useState<User[]>([])
     const [loadingUsers, setLoadingUsers] = useState(true)
     const [userSearchTerm, setUserSearchTerm] = useState("")
-
-    // Filter users based on search term
-    const filteredUsers = users.filter(user => {
-        const name = user.name || ""
-        const email = user.email || ""
-        return (
-            name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-            email.toLowerCase().includes(userSearchTerm.toLowerCase())
-        )
-    })
+    const [usersError, setUsersError] = useState<string | null>(null);
+    const debouncedSearchTerm = useDebounce(userSearchTerm, 300);
 
     // Load users
     useEffect(() => {
         setLoadingUsers(true)
-        fetch(`${API_URL}/users/`, { credentials: "include" })
-            .then((res) => {
-                if (!res.ok) throw new Error("Error al cargar usuarios")
-                return res.json()
-            })
-            .then(setUsers)
-            .catch(() => setUsers([]))
-            .finally(() => setLoadingUsers(false))
-    }, [])
+        const loadUsers = async () => {
+            try {
+                setUsers([]);
+                const response = await fetch(`${API_URL}/users/all?search=${debouncedSearchTerm}`, {
+                    credentials: "include"
+                });
+
+                if (!response.ok) {
+                    throw new Error("Error al cargar usuarios");
+                }
+
+                const data = await response.json();
+                setUsers(Array.isArray(data.data) ? data.data : []);
+                setUsersError(null);
+                setLoadingUsers(false);
+            } catch (error) {
+                console.error("Error loading usuarios:", error);
+                setUsers([]);
+                setUsersError(
+                    error instanceof Error
+                        ? error.message
+                        : "Error al cargar usuarios"
+                );
+            } finally {
+                setLoadingUsers(false);
+            }
+        }
+        loadUsers()
+    }, [debouncedSearchTerm])
+
 
     // Vehicles state
     const [userVehicles, setUserVehicles] = useState<Vehicle[]>([])
@@ -188,24 +230,9 @@ export function NewAppointmentForm({
         return () => subscription.unsubscribe()
     }, [watch, setValue])
 
-    const formValues = form.watch(); // Observa todos los valores
-    useEffect(() => {
-        const prepareSubmitData = () => {
-            return {
-                appointment: {
-                    appointment_time: formValues.appointment_time?.toISOString(),
-                    user_id: formValues.user_id,
-                    vehicle_id: formValues.vehicle_id,
-                },
-                services: formValues.services?.map(service_id => ({ service_id })) || [],
-            };
-        };
-
-        const submitData = prepareSubmitData();
-        console.log("Payload listo para API:", JSON.stringify(submitData, null, 2));
-    }, [formValues]);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isOpen, setIsOpen] = useState(false)
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setIsSubmitting(true);
@@ -243,6 +270,7 @@ export function NewAppointmentForm({
     }
 
 
+    console.log(users)
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -250,66 +278,77 @@ export function NewAppointmentForm({
                 <FormField
                     control={form.control}
                     name="appointment_time"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Fecha y Hora</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button
-                                            variant="outline"
-                                            className="pl-3 text-left font-normal"
-                                        >
-                                            {field.value ? (
-                                                format(field.value, "PPPp", { locale: es })
-                                            ) : (
-                                                <span>Selecciona una fecha</span>
-                                            )}
-                                            <IconCalendar className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) => date < new Date()}
-                                        initialFocus
-                                    />
-                                    <div className="px-4 pb-4">
-                                        <Select
-                                            value={format(field.value, "HH:mm")}
-                                            onValueChange={(time) => {
-                                                const [hours, minutes] = time.split(":")
-                                                const newDate = new Date(field.value)
-                                                newDate.setHours(Number(hours))
-                                                newDate.setMinutes(Number(minutes))
-                                                field.onChange(newDate)
-                                            }}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecciona hora" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Array.from({ length: 24 }, (_, i) => {
-                                                    const hour = 0 + i
-                                                    return [`${hour}:00`, `${hour}:30`]
-                                                })
-                                                    .flat()
-                                                    .map((time) => (
+                    render={({ field }) => {
+                        const handleTimeChange = (time: string) => {
+                            const [hours, minutes] = time.split(":");
+                            const newDate = new Date(field.value || new Date());
+                            newDate.setHours(Number(hours));
+                            newDate.setMinutes(Number(minutes));
+                            field.onChange(newDate);
+                        };
+
+                        const generateTimeSlots = () => {
+                            return Array.from({ length: 24 }, (_, hour) => [
+                                `${hour.toString().padStart(2, '0')}:00`,
+                                `${hour.toString().padStart(2, '0')}:30`
+                            ]).flat();
+                        };
+
+                        return (
+                            <FormItem className="flex flex-col space-y-2">
+                                <FormLabel className="font-medium">Fecha y Hora</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-between text-left font-normal"
+                                            >
+                                                {field.value ? (
+                                                    format(field.value, "PPPp", { locale: es })
+                                                ) : (
+                                                    <span className="text-muted-foreground">Selecciona una fecha</span>
+                                                )}
+                                                <IconCalendar className="ml-2 h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+
+                                    <PopoverContent className="w-auto p-0 space-y-4" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={field.onChange}
+                                            disabled={(date) =>
+                                                date < new Date(new Date().setHours(0, 0, 0, 0))
+                                            }
+                                            initialFocus
+                                            className="border-b"
+                                        />
+
+                                        <div className="px-4 pb-4">
+                                            <Select
+                                                value={field.value ? format(field.value, "HH:mm") : undefined}
+                                                onValueChange={handleTimeChange}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Selecciona hora" />
+                                                </SelectTrigger>
+                                                <SelectContent className="max-h-[200px] overflow-y-auto">
+                                                    {generateTimeSlots().map((time) => (
                                                         <SelectItem key={time} value={time}>
                                                             {time}
                                                         </SelectItem>
                                                     ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                        </FormItem>
-                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                            </FormItem>
+                        );
+                    }}
                 />
 
                 {/* Campo de Usuario con buscador */}
@@ -317,65 +356,68 @@ export function NewAppointmentForm({
                     control={form.control}
                     name="user_id"
                     render={({ field }) => (
-                        <FormItem className="flex flex-col">
+                        <FormItem className="flex flex-col relative">
                             <FormLabel className="flex items-center gap-2">
                                 <IconUser className="h-4 w-4" />
                                 Usuario
                             </FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            className="w-full justify-between"
-                                            disabled={loadingUsers}
-                                        >
-                                            {field.value
-                                                ? users.find((user) => user.id === field.value)?.name || "Seleccionar usuario"
-                                                : "Seleccionar usuario"}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0">
-                                    <Command>
+
+                            {usersError ? (
+                                <div className="text-red-500 text-sm">{usersError}</div>
+                            ) : (
+                                <div className="relative">
+                                    <Command shouldFilter={false} className="rounded-lg border shadow-md">
                                         <CommandInput
                                             placeholder="Buscar usuario..."
                                             value={userSearchTerm}
                                             onValueChange={setUserSearchTerm}
+                                            onFocus={() => setIsOpen(true)}
+                                            onBlur={() => setTimeout(() => setIsOpen(false), 200)}
                                         />
-                                        <CommandList>
-                                            <CommandEmpty>
-                                                {loadingUsers ? "Cargando..." : "No se encontraron usuarios"}
-                                            </CommandEmpty>
-                                            <CommandGroup>
-                                                {filteredUsers.map((user) => (
-                                                    <CommandItem
-                                                        key={user.id}
-                                                        value={user.id}
-                                                        onSelect={() => {
-                                                            form.setValue("user_id", user.id)
-                                                            form.setValue("vehicle_id", "")
-                                                        }}
-                                                    >
-                                                        <Check
-                                                            className={cn(
-                                                                "mr-2 h-4 w-4",
-                                                                field.value === user.id ? "opacity-100" : "opacity-0"
-                                                            )}
-                                                        />
-                                                        <div className="flex flex-col">
-                                                            <span>{user.name}</span>
-                                                            <span className="text-xs text-muted-foreground">{user.email}</span>
-                                                        </div>
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandGroup>
-                                        </CommandList>
+
+                                        {isOpen && (
+                                            <CommandList className="absolute top-full left-0 w-full z-10 bg-white border border-t-0 rounded-b-lg shadow-lg max-h-60 overflow-auto">
+                                                {loadingUsers ? (
+                                                    <div className="py-3 text-center text-sm">
+                                                        <IconLoader className="h-4 w-4 animate-spin mx-auto" />
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <CommandEmpty>No se encontraron usuarios</CommandEmpty>
+                                                        <CommandGroup>
+                                                            {users.map((user) => (
+                                                                <CommandItem
+                                                                    key={user.id}
+                                                                    value={user.id}
+                                                                    onSelect={() => {
+                                                                        form.setValue("user_id", user.id)
+                                                                        form.setValue("vehicle_id", "")
+                                                                        setIsOpen(false)
+                                                                    }}
+                                                                    className="cursor-pointer hover:bg-gray-100"
+                                                                >
+                                                                    <Check
+                                                                        className={cn(
+                                                                            "mr-2 h-4 w-4",
+                                                                            field.value === user.id ? "opacity-100" : "opacity-0"
+                                                                        )}
+                                                                    />
+                                                                    <div className="flex flex-col">
+                                                                        <span>{user.name}</span>
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            {user.email}
+                                                                        </span>
+                                                                    </div>
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </>
+                                                )}
+                                            </CommandList>
+                                        )}
                                     </Command>
-                                </PopoverContent>
-                            </Popover>
+                                </div>
+                            )}
                             <FormMessage />
                         </FormItem>
                     )}
