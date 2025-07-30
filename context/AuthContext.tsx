@@ -4,7 +4,6 @@ import { toast } from "sonner"
 import { API_URL } from "@/config/config";
 import { User } from "@/types/types";
 
-
 interface AuthContextProps {
     user: User | null;
     loading: boolean;
@@ -25,9 +24,7 @@ const AuthContext = createContext<AuthContextProps>({
     canAccess: () => false,
     getDefaultRouteForRole: () => "/",
     logOut: () => { }
-
 });
-
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -38,7 +35,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             const res = await fetch(`${API_URL}/users/me`, {
                 method: "GET",
-                credentials: "include",
+                credentials: "include", // Usa cookies HTTP-Only
+                headers: {
+                    'Cache-Control': 'no-store' // Evita caché del navegador
+                }
             });
 
             if (!res.ok) {
@@ -57,13 +57,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const canAccess = (path: string | undefined): boolean => {
         if (!user || !path) return false;
-
         if (user.role === "admin") return true;
-
         if (user.role === "client") {
             return USER_ALLOWED_ROUTES.some((route) => path.startsWith(route));
         }
-
         return false;
     };
 
@@ -74,7 +71,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const logOut = async () => {
-
         const toastId = toast.loading("Cerrando sesión...");
         try {
             const res = await fetch(`${API_URL}/auth/logout`, {
@@ -90,6 +86,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
 
             setUser(null);
+            // Limpiar caché al cerrar sesión
+            localStorage.removeItem('cachedUser');
+            localStorage.removeItem('cachedUserTimestamp');
             toast.success("Sesión cerrada correctamente");
         } catch (error) {
             toast.dismiss(toastId);
@@ -119,4 +118,4 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => useContext(AuthContext);

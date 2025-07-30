@@ -16,7 +16,7 @@ export default function WhyChooseUs() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div>
                         <img
-                            src="/placeholder.svg?height=400&width=600"
+                            src="/ghiblilogo1.jpg"
                             alt="Equipo de AutoLavado Exprés"
                             className="rounded-lg shadow-lg"
                         />
