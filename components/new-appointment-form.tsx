@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
-import { IconCalendar, IconCar, IconLoader } from "@tabler/icons-react"
+import { IconCar, IconLoader } from "@tabler/icons-react"
+import { CalendarIcon } from "lucide-react"
 import { API_URL } from "@/config/config"
 import { getCsrfToken } from "@/lib/getcrfstoken"
 
@@ -139,15 +140,16 @@ export function NewAppointmentForm({
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setIsSubmitting(true);
         try {
+            const localToUTC = new Date(values.appointment_time.getTime() - values.appointment_time.getTimezoneOffset() * 60000);
             const response = await fetch(`${API_URL}/appointments`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": getCsrfToken() || "",
+                    "X-CSRF-TOKEN": getCsrfToken() || ""
                 },
                 credentials: "include",
                 body: JSON.stringify({
-                    appointment_time: values.appointment_time.toISOString(),
+                    appointment_time: localToUTC.toISOString(),
                     vehicle_id: values.vehicle_id,
                     services: values.services.map((id) => ({ service_id: id })),
                 }),
@@ -178,54 +180,59 @@ export function NewAppointmentForm({
                     control={form.control}
                     name="appointment_time"
                     render={({ field }) => {
+                        // Función para aplicar la hora seleccionada (corrigiendo desfase de zona horaria al enviar)
                         const handleTimeChange = (time: string) => {
                             const [hours, minutes] = time.split(":");
-                            const newDate = new Date(field.value || new Date());
+                            const newDate = field.value ? new Date(field.value) : new Date();
+
                             newDate.setHours(Number(hours));
                             newDate.setMinutes(Number(minutes));
+                            newDate.setSeconds(0);
+                            newDate.setMilliseconds(0);
+
                             field.onChange(newDate);
                         };
 
+                        // Generar opciones de tiempo cada 30 minutos
                         const generateTimeSlots = () => {
                             return Array.from({ length: 24 }, (_, hour) => [
-                                `${hour.toString().padStart(2, '0')}:00`,
-                                `${hour.toString().padStart(2, '0')}:30`
+                                { value: `${hour.toString().padStart(2, "0")}:00`, label: `${hour.toString().padStart(2, "0")}:00` },
+                                { value: `${hour.toString().padStart(2, "0")}:30`, label: `${hour.toString().padStart(2, "0")}:30` }
                             ]).flat();
                         };
 
                         return (
                             <FormItem className="flex flex-col space-y-2">
                                 <FormLabel className="font-medium">Fecha y Hora</FormLabel>
+
                                 <Popover>
                                     <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button
-                                                variant="outline"
-                                                className="w-full justify-between text-left font-normal"
-                                            >
-                                                {field.value ? (
-                                                    format(field.value, "PPPp", { locale: es })
-                                                ) : (
-                                                    <span className="text-muted-foreground">Selecciona una fecha</span>
-                                                )}
-                                                <IconCalendar className="ml-2 h-4 w-4 opacity-50" />
-                                            </Button>
-                                        </FormControl>
+                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {field.value
+                                                ? `${format(field.value, "PPP", { locale: es })} ${format(field.value, "HH:mm")}`
+                                                : "Selecciona fecha y hora"}
+                                        </Button>
                                     </PopoverTrigger>
-
-                                    <PopoverContent className="w-auto p-0 space-y-4" align="start">
+                                    <PopoverContent className="w-auto p-4 space-y-4">
                                         <Calendar
                                             mode="single"
                                             selected={field.value}
-                                            onSelect={field.onChange}
-                                            disabled={(date) =>
-                                                date < new Date(new Date().setHours(0, 0, 0, 0))
-                                            }
-                                            initialFocus
-                                            className="border-b"
+                                            locale={es}
+                                            onSelect={(date) => {
+                                                if (!date) return;
+                                                const newDate = new Date(date);
+                                                if (field.value) {
+                                                    newDate.setHours(field.value.getHours());
+                                                    newDate.setMinutes(field.value.getMinutes());
+                                                }
+                                                field.onChange(newDate);
+                                            }}
+                                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                         />
 
-                                        <div className="px-4 pb-4">
+                                        <div>
+                                            <p className="text-sm font-medium mb-2">Selecciona hora</p>
                                             <Select
                                                 value={field.value ? format(field.value, "HH:mm") : undefined}
                                                 onValueChange={handleTimeChange}
@@ -233,10 +240,10 @@ export function NewAppointmentForm({
                                                 <SelectTrigger className="w-full">
                                                     <SelectValue placeholder="Selecciona hora" />
                                                 </SelectTrigger>
-                                                <SelectContent className="max-h-[200px] overflow-y-auto">
-                                                    {generateTimeSlots().map((time) => (
-                                                        <SelectItem key={time} value={time}>
-                                                            {time}
+                                                <SelectContent>
+                                                    {generateTimeSlots().map((slot) => (
+                                                        <SelectItem key={slot.value} value={slot.value}>
+                                                            {slot.label}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -244,6 +251,7 @@ export function NewAppointmentForm({
                                         </div>
                                     </PopoverContent>
                                 </Popover>
+
                                 <FormMessage />
                             </FormItem>
                         );
