@@ -139,8 +139,20 @@ export function NewAppointmentForm({
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setIsSubmitting(true);
+        const date = new Date(values.appointment_time);
+
+        // Crear string ISO con offset local explícito
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const timezoneOffset = -date.getTimezoneOffset();
+        const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+        const offsetHours = pad(Math.floor(Math.abs(timezoneOffset) / 60));
+        const offsetMinutes = pad(Math.abs(timezoneOffset) % 60);
+
+        const localISOTime =
+            `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+            `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}` +
+            `${offsetSign}${offsetHours}:${offsetMinutes}`;
         try {
-            const localToUTC = new Date(values.appointment_time.getTime() - values.appointment_time.getTimezoneOffset() * 60000);
             const response = await fetch(`${API_URL}/appointments`, {
                 method: "POST",
                 headers: {
@@ -149,7 +161,7 @@ export function NewAppointmentForm({
                 },
                 credentials: "include",
                 body: JSON.stringify({
-                    appointment_time: localToUTC.toISOString(),
+                    appointment_time: localISOTime,
                     vehicle_id: values.vehicle_id,
                     services: values.services.map((id) => ({ service_id: id })),
                 }),
@@ -180,37 +192,56 @@ export function NewAppointmentForm({
                     control={form.control}
                     name="appointment_time"
                     render={({ field }) => {
-                        // Función para aplicar la hora seleccionada (corrigiendo desfase de zona horaria al enviar)
+                        // Función para aplicar la hora seleccionada (manteniendo hora local)
                         const handleTimeChange = (time: string) => {
                             const [hours, minutes] = time.split(":");
-                            const newDate = field.value ? new Date(field.value) : new Date();
+                            const date = field.value ? new Date(field.value) : new Date();
 
-                            newDate.setHours(Number(hours));
-                            newDate.setMinutes(Number(minutes));
-                            newDate.setSeconds(0);
-                            newDate.setMilliseconds(0);
+                            // Mantener como hora local SIN conversión a UTC
+                            date.setHours(Number(hours));
+                            date.setMinutes(Number(minutes));
+                            date.setSeconds(0);
+                            date.setMilliseconds(0);
 
-                            field.onChange(newDate);
+                            field.onChange(date); // Enviar como fecha local
                         };
 
                         // Generar opciones de tiempo cada 30 minutos
                         const generateTimeSlots = () => {
-                            return Array.from({ length: 24 }, (_, hour) => [
-                                { value: `${hour.toString().padStart(2, "0")}:00`, label: `${hour.toString().padStart(2, "0")}:00` },
-                                { value: `${hour.toString().padStart(2, "0")}:30`, label: `${hour.toString().padStart(2, "0")}:30` }
-                            ]).flat();
+                            const slots = [];
+                            for (let hour = 0; hour < 24; hour++) {
+                                slots.push(
+                                    { value: `${hour.toString().padStart(2, "0")}:00`, label: `${hour.toString().padStart(2, "0")}:00` },
+                                    { value: `${hour.toString().padStart(2, "0")}:30`, label: `${hour.toString().padStart(2, "0")}:30` }
+                                );
+                            }
+                            return slots;
+                        };
+
+                        // Función para deshabilitar fechas pasadas
+                        const isDateDisabled = (date: Date) => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return date < today;
+                        };
+
+                        const isTimeDisabled = (date: Date, timeSlot: string) => {
+                            const [hours, minutes] = timeSlot.split(":").map(Number);
+                            const slotDate = new Date(date);
+                            slotDate.setHours(hours, minutes);
+
+                            return slotDate < new Date(); // Deshabilitar horas pasadas
                         };
 
                         return (
                             <FormItem className="flex flex-col space-y-2">
                                 <FormLabel className="font-medium">Fecha y Hora</FormLabel>
-
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-full justify-start text-left font-normal">
                                             <CalendarIcon className="mr-2 h-4 w-4" />
                                             {field.value
-                                                ? `${format(field.value, "PPP", { locale: es })} ${format(field.value, "HH:mm")}`
+                                                ? `${format(field.value, "PPP", { locale: es })} a las ${format(field.value, "HH:mm")}`
                                                 : "Selecciona fecha y hora"}
                                         </Button>
                                     </PopoverTrigger>
@@ -223,12 +254,16 @@ export function NewAppointmentForm({
                                                 if (!date) return;
                                                 const newDate = new Date(date);
                                                 if (field.value) {
+                                                    // Mantener la hora seleccionada previamente
                                                     newDate.setHours(field.value.getHours());
                                                     newDate.setMinutes(field.value.getMinutes());
+                                                } else {
+                                                    // Hora por defecto: primera disponible del día
+                                                    newDate.setHours(8, 0, 0, 0);
                                                 }
                                                 field.onChange(newDate);
                                             }}
-                                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                            disabled={isDateDisabled}
                                         />
 
                                         <div>
@@ -242,7 +277,11 @@ export function NewAppointmentForm({
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {generateTimeSlots().map((slot) => (
-                                                        <SelectItem key={slot.value} value={slot.value}>
+                                                        <SelectItem
+                                                            key={slot.value}
+                                                            value={slot.value}
+                                                            disabled={field.value && isTimeDisabled(field.value, slot.value)}
+                                                        >
                                                             {slot.label}
                                                         </SelectItem>
                                                     ))}
@@ -251,7 +290,6 @@ export function NewAppointmentForm({
                                         </div>
                                     </PopoverContent>
                                 </Popover>
-
                                 <FormMessage />
                             </FormItem>
                         );

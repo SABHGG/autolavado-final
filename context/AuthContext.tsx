@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { getToken, onMessage } from "firebase/messaging"
 import { messaging } from "@/lib/firebase"
 import { toast } from "sonner";
+import { getCsrfToken } from "@/lib/getcrfstoken"
 import { API_URL } from "@/config/config";
 import { User } from "@/types/types";
 
@@ -32,7 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [fcmToken, setFcmToken] = useState<string | null>(null);
-
+    const csrfToken = getCsrfToken();
     const checkAuth = async () => {
         setLoading(true);
         try {
@@ -64,55 +65,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const registerAdminToken = async () => {
         try {
-            if (fcmToken || localStorage.getItem('fcmToken')) return;
+
+            if (fcmToken || localStorage.getItem("fcmToken")) return;
+
             if (!messaging) return;
+
+
             const permission = await Notification.requestPermission();
+
             if (permission !== "granted") return;
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            try {
-                const token = await getToken(messaging, {
-                    vapidKey: "BFHUMXPUUsGNiVBTuuI7c-visEA7l3H1WDC1hviol8TAzfQgnakP86ndSwlzRtlWSZTFXAkXXAhhFxyT2d2q0Vo",
-                    serviceWorkerRegistration: registration
-                });
 
-                if (token) {
-                    setFcmToken(token);
-                    localStorage.setItem('fcmToken', token);
-                    try {
-                        const response = await fetch(`${API_URL}/fcm/register`, {
-                            method: "POST",
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            credentials: "include",
-                            body: JSON.stringify({ token }),
-                        });
+            await navigator.serviceWorker.register("/firebase-messaging-sw.js");
 
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            console.error("Error al registrar token FCM:", errorData);
-                        }
+            const readyRegistration = await navigator.serviceWorker.ready;
 
-                    } catch (error) {
-                        console.error("Error en la petición FCM:", error);
-                    }
-                } else {
-                    console.warn("No se pudo obtener token (posible sin permisos)");
-                }
+            const token = await getToken(messaging, {
+                vapidKey: "BNGRsy4sayjrkefvnpgf3jL5xv3XgX1zTbk28maT0L5fnEi_7Pdv8pkbWBma6Z7u66JyRENRPS1uxFwpDkhR0lk",
+                serviceWorkerRegistration: readyRegistration
+            });
 
-            } catch (error) {
-                console.error("Error al obtener token FCM:", error);
+            if (!token) return;
+
+            setFcmToken(token);
+            localStorage.setItem("fcmToken", token);
+
+            const response = await fetch(`${API_URL}/fcm/register`, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || ''
+                },
+                credentials: "include",
+                body: JSON.stringify({ token }),
+            });
+
+            if (!response.ok) {
+                console.error("❌ Error al registrar token en backend:", await response.text());
+            } else {
+                console.log("✅ Token registrado en backend correctamente.");
             }
 
             onMessage(messaging, (payload) => {
-                toast(payload.notification?.title ?? "Notificación", {
-                    description: payload.notification?.body,
-                });
+                new Notification(
+                    payload.notification?.title || "Nueva notificación",
+                    {
+                        body: payload.notification?.body,
+                        icon: "/icon.webp", // Ruta a tu ícono
+                    }
+                )
             });
 
+            console.log("✅ Registro de token FCM finalizado con éxito.");
         } catch (err) {
-            console.error("Error al registrar token FCM:", err);
+            console.error("❌ Error en registro de token FCM:", err);
         }
+
     };
 
     const canAccess = (path: string | undefined): boolean => {

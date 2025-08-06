@@ -235,10 +235,23 @@ export function NewAppointmentForm({
     const [isOpen, setIsOpen] = useState(false)
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
+
         setIsSubmitting(true);
+        const date = new Date(values.appointment_time);
+
+        // Crear string ISO con offset local explícito
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const timezoneOffset = -date.getTimezoneOffset();
+        const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+        const offsetHours = pad(Math.floor(Math.abs(timezoneOffset) / 60));
+        const offsetMinutes = pad(Math.abs(timezoneOffset) % 60);
+
+        const localISOTime =
+            `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+            `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}` +
+            `${offsetSign}${offsetHours}:${offsetMinutes}`;
+
         try {
-            // Ajuste de zona horaria: compensa el desfase local antes de enviar con toISOString()
-            const localToUTC = new Date(values.appointment_time.getTime() - values.appointment_time.getTimezoneOffset() * 60000);
             const response = await fetch(`${API_URL}/appointments`, {
                 method: "POST",
                 headers: {
@@ -247,7 +260,7 @@ export function NewAppointmentForm({
                 },
                 credentials: "include",
                 body: JSON.stringify({
-                    appointment_time: localToUTC.toISOString(),
+                    appointment_time: localISOTime,
                     vehicle_id: values.vehicle_id,
                     user_id: values.user_id,
                     services: values.services.map((id) => ({ service_id: id })),
@@ -282,14 +295,15 @@ export function NewAppointmentForm({
                         // Función para aplicar la hora seleccionada (corrigiendo desfase de zona horaria al enviar)
                         const handleTimeChange = (time: string) => {
                             const [hours, minutes] = time.split(":");
-                            const newDate = field.value ? new Date(field.value) : new Date();
+                            const date = field.value ? new Date(field.value) : new Date();
 
-                            newDate.setHours(Number(hours));
-                            newDate.setMinutes(Number(minutes));
-                            newDate.setSeconds(0);
-                            newDate.setMilliseconds(0);
+                            // Establecer hora/minutos en LOCAL (no convertir a UTC aquí)
+                            date.setHours(Number(hours));
+                            date.setMinutes(Number(minutes));
+                            date.setSeconds(0);
+                            date.setMilliseconds(0);
 
-                            field.onChange(newDate);
+                            field.onChange(date);
                         };
 
                         // Generar opciones de tiempo cada 30 minutos
