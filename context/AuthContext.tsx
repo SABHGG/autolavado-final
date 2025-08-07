@@ -33,7 +33,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [fcmToken, setFcmToken] = useState<string | null>(null);
-    const csrfToken = getCsrfToken();
+    const [csrfToken, setCsrfToken] = useState<string | null>(null);
+
+    useEffect(() => {
+        setCsrfToken(getCsrfToken());
+    }, []);
     const checkAuth = async () => {
         setLoading(true);
         try {
