@@ -33,11 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [fcmToken, setFcmToken] = useState<string | null>(null);
-    const [csrfToken, setCsrfToken] = useState<string | null>(null);
 
-    useEffect(() => {
-        setCsrfToken(getCsrfToken());
-    }, []);
     const checkAuth = async () => {
         setLoading(true);
         try {
@@ -66,7 +62,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setLoading(false);
         }
     };
-
     const registerAdminToken = async () => {
         try {
 
@@ -97,7 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || ''
+                    'X-CSRF-TOKEN': getCsrfToken() || ''
                 },
                 credentials: "include",
                 body: JSON.stringify({ token }),

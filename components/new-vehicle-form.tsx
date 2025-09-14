@@ -28,9 +28,9 @@ import {
 
 const vehicleFormSchema = z.object({
     plate: z.string()
-        .min(6, "La matrícula debe tener exactamente 6 caracteres (3 letras + 3 números)")
-        .max(6, "La matrícula debe tener exactamente 6 caracteres (3 letras + 3 números)")
-        .regex(/^[A-Z]{3}\d{3}$/, "Formato inválido. Debe ser 3 letras seguidas de 3 números (ej: ABC123)")
+        .min(6, "La matrícula debe tener exactamente 6 caracteres")
+        .max(6, "La matrícula debe tener exactamente 6 caracteres")
+        .regex(/^[A-Z]{3}\d{2}[A-Z0-9]$/, "Formato inválido. Debe ser 3 letras seguidas de 2 números y terminar en letra o número (ej: ABC12D o ABC123)")
         .transform(val => val.toUpperCase()),
     brand: z.string()
         .min(2, "La marca debe tener al menos 2 caracteres")
@@ -122,13 +122,27 @@ export function NewVehicleForm({
                                     onChange={(e) => {
                                         // Filtra solo letras y números
                                         const value = e.target.value.replace(/[^a-zA-Z0-9]/g, '')
-                                        // Limita a 3 letras seguidas de números
-                                        let formattedValue = value
-                                        if (value.length > 3) {
-                                            formattedValue =
-                                                value.substring(0, 3).toUpperCase() +
-                                                value.substring(3).replace(/\D/g, '')
+
+                                        let formattedValue = ''
+
+                                        if (value.length > 0) {
+                                            // Primeros 3 -> solo letras en mayúscula
+                                            formattedValue += value.substring(0, 3).replace(/[^a-zA-Z]/g, '').toUpperCase()
                                         }
+
+                                        if (value.length > 3) {
+                                            // Del 4 al 5 -> solo números
+                                            formattedValue += value.substring(3, 5).replace(/\D/g, '')
+                                        }
+
+                                        if (value.length > 5) {
+                                            // Último (6) -> puede ser número o letra, se deja tal cual
+                                            formattedValue += value.substring(5, 6).toUpperCase()
+                                        }
+
+                                        // Limita a 6 caracteres
+                                        formattedValue = formattedValue.substring(0, 6)
+
                                         field.onChange(formattedValue)
                                     }}
                                 />
