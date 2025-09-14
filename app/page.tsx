@@ -15,7 +15,7 @@ export default function Home() {
         <Testimonials />
       </main>
       <footer className="py-6 text-center text-sm text-muted-foreground">
-        © 2024 AutoLavado Exprés. Todos los derechos reservados.
+        © 2025 HARDSOFT. Todos los derechos reservados.
       </footer>
     </div>
   )

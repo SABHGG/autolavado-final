@@ -29,7 +29,6 @@ export default function Header() {
                 <ul className="flex space-x-4">
                     <li><Link href="/#servicios" className=" hover:text-primary">Servicios</Link></li>
                     <li><Link href="/#por-que-nosotros" className=" hover:text-primary">Por qué elegirnos</Link></li>
-                    <li><Link href="/#cita" className=" hover:text-primary">Reservar cita</Link></li>
                     <li><Link href="/login" className="">Ingresar</Link></li>
                     <li><Link href="/register" className="">Registrar</Link></li>
                 </ul>
@@ -41,7 +40,6 @@ export default function Header() {
                     <ul className="flex flex-col space-y-4 p-4">
                         <li><Link href="/#servicios" onClick={() => setIsOpen(false)} className=" hover:text-primary">Servicios</Link></li>
                         <li><Link href="/#por-que-nosotros" onClick={() => setIsOpen(false)} className=" hover:text-primary">Por qué elegirnos</Link></li>
-                        <li><Link href="/#cita" onClick={() => setIsOpen(false)} className="hover:text-primary">Reservar cita</Link></li>
                         <li><Link href="/login" onClick={() => setIsOpen(false)} className="">Ingresar</Link></li>
                         <li><Link href="/register" onClick={() => setIsOpen(false)} className="">Registrar</Link></li>
                     </ul>
