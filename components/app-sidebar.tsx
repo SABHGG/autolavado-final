@@ -120,7 +120,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
     teams: [
       {
-        name: "Autolavado La 44",
+        name: "Autolavado La 22",
         logo: WashingMachine,
         plan: "Enterprise",
       }
